@@ -4,6 +4,14 @@
 
 基于 Playwright 和 AI 的闲鱼多任务实时监控，提供完整的 Web 管理界面。
 
+## 📚 详细文档
+
+完整使用说明见 [`docs/`](./docs/README.md) 目录：
+
+- [用户使用指南](./docs/user-guide.md) — 安装、配置、日常使用
+- [闲鱼 Cookie 获取指南](./docs/getting-xianyu-cookies.md) — 开发者工具手动抓 Cookie / Chrome 扩展导入
+- [AI 提供方配置：OpenAI 与 Cursor SDK](./docs/ai-provider.md) — OpenAI 兼容接口与 Cursor SDK 切换说明
+
 
 ## 核心特性
 
@@ -70,10 +78,15 @@ docker compose up -d
 
 | 变量 | 说明 | 必填 |
 |------|------|------|
-| `OPENAI_API_KEY` | AI 模型 API Key | 是 |
-| `OPENAI_BASE_URL` | OpenAI 兼容接口地址 | 是 |
-| `OPENAI_MODEL_NAME` | 支持图片输入的模型名称 | 是 |
+| `AI_PROVIDER` | AI 提供方：`openai`（默认）或 `cursor` | 否 |
+| `OPENAI_API_KEY` | OpenAI 兼容 API Key（`AI_PROVIDER=openai` 时） | 是* |
+| `OPENAI_BASE_URL` | OpenAI 兼容接口地址 | 是* |
+| `OPENAI_MODEL_NAME` | 支持图片输入的模型名称 | 是* |
+| `CURSOR_API_KEY` | Cursor API Key（`AI_PROVIDER=cursor` 时） | 是* |
+| `CURSOR_MODEL_NAME` | Cursor 模型 ID，如 `composer-2.5` | 是* |
 | `WEB_USERNAME` / `WEB_PASSWORD` | Web UI 登录账号密码，默认 `admin/admin123` | 否 |
+
+\* 按所选 `AI_PROVIDER` 填写对应项，详见 [AI 提供方配置](./docs/ai-provider.md)。
 
 其余配置见下方“配置说明”。
 
@@ -81,9 +94,10 @@ docker compose up -d
 ### 第一次使用
 
 1. 打开默认 Web UI `http://127.0.0.1:8000` 并登录。
-2. 进入“闲鱼账号管理”，使用 [Chrome 扩展](https://chromewebstore.google.com/detail/xianyu-login-state-extrac/eidlpfjiodpigmfcahkmlenhppfklcoa) 导出并粘贴闲鱼登录态 JSON。
+2. 按 [闲鱼 Cookie 获取指南](./docs/getting-xianyu-cookies.md) 导入登录态（推荐 Chrome 扩展，或开发者工具手动复制 Cookie）。
 3. 登录态文件会保存到 `state/` 目录，例如 `state/acc_1.json`。
-4. 回到“任务管理”，创建任务并绑定账号后即可运行。
+4. 按 [AI 提供方配置](./docs/ai-provider.md) 完成 AI 配置（OpenAI 兼容或 Cursor SDK）。
+5. 回到「任务管理」，创建任务并绑定账号后即可运行。
 
 ### 创建第一个任务
 
