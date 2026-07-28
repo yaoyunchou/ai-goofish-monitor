@@ -81,6 +81,7 @@ def test_call_ai_retries_without_structured_output_when_model_rejects_it():
         model_name="fake-model",
         enable_response_format=True,
         enable_thinking=False,
+        normalized_provider=lambda: "openai",
     )
     request_history = []
 
@@ -117,6 +118,7 @@ def test_call_ai_falls_back_to_responses_when_chat_completions_api_is_missing():
         model_name="fake-model",
         enable_response_format=True,
         enable_thinking=False,
+        normalized_provider=lambda: "openai",
     )
     request_history = []
 
@@ -153,6 +155,7 @@ def test_call_ai_retries_without_temperature_when_gateway_rejects_it():
         model_name="fake-model",
         enable_response_format=False,
         enable_thinking=False,
+        normalized_provider=lambda: "openai",
     )
     request_history = []
 
@@ -183,6 +186,7 @@ def test_call_ai_retries_when_response_content_is_empty():
         model_name="fake-model",
         enable_response_format=False,
         enable_thinking=False,
+        normalized_provider=lambda: "openai",
     )
     request_history = []
 
@@ -206,6 +210,7 @@ def test_call_ai_raises_after_all_empty_response_retries_are_exhausted():
         model_name="fake-model",
         enable_response_format=False,
         enable_thinking=False,
+        normalized_provider=lambda: "openai",
     )
     request_history = []
 
@@ -229,6 +234,7 @@ def test_close_closes_underlying_async_client_and_clears_reference():
         close_state["closed"] = True
 
     client.client = SimpleNamespace(close=fake_close)
+    client.cursor_transport = None
 
     asyncio.run(client.close())
 

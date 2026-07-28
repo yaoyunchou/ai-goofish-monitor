@@ -2,6 +2,7 @@ python-dotenv
 playwright
 requests
 openai
+cursor-sdk
 fastapi
 uvicorn[standard]
 pydantic-settings

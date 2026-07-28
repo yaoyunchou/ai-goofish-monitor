@@ -204,28 +204,84 @@ watch(selectedPrompt, async (value) => {
           </CardHeader>
           <CardContent v-if="isReady" class="space-y-4">
             <div class="grid gap-2">
-              <Label>API Base URL</Label>
-              <Input v-model="aiSettings.OPENAI_BASE_URL" placeholder="https://api.openai.com/v1" />
+              <Label>AI Provider</Label>
+              <Select v-model="aiSettings.AI_PROVIDER">
+                <SelectTrigger>
+                  <SelectValue placeholder="openai" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="openai">OpenAI Compatible</SelectItem>
+                  <SelectItem value="cursor">Cursor SDK</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <div class="grid gap-2">
-              <Label>API Key</Label>
-              <Input
-                v-model="aiSettings.OPENAI_API_KEY"
-                type="password"
-                :placeholder="t('settings.ai.keyPlaceholder')"
-              />
-              <p class="text-xs text-gray-500">
-                {{ systemStatus?.env_file.openai_api_key_set ? t('settings.ai.keyConfigured') : t('settings.ai.keyMissing') }}
-              </p>
-            </div>
-            <div class="grid gap-2">
-              <Label>{{ t('settings.ai.modelName') }}</Label>
-              <Input v-model="aiSettings.OPENAI_MODEL_NAME" placeholder="gpt-3.5-turbo" />
-            </div>
-            <div class="grid gap-2">
-              <Label>{{ t('settings.ai.proxy') }}</Label>
-              <Input v-model="aiSettings.PROXY_URL" placeholder="http://127.0.0.1:7890" />
-            </div>
+
+            <template v-if="(aiSettings.AI_PROVIDER || 'openai') === 'cursor'">
+              <div class="grid gap-2">
+                <Label>Cursor API Key</Label>
+                <Input
+                  v-model="aiSettings.CURSOR_API_KEY"
+                  type="password"
+                  placeholder="crsr_..."
+                />
+                <p class="text-xs text-gray-500">
+                  {{ systemStatus?.env_file.cursor_api_key_set ? 'Cursor API Key 已配置' : 'Cursor API Key 未配置' }}
+                </p>
+              </div>
+              <div class="grid gap-2">
+                <Label>Cursor Model</Label>
+                <Input v-model="aiSettings.CURSOR_MODEL_NAME" placeholder="composer-2.5" />
+              </div>
+              <div class="grid gap-2">
+                <Label>Cursor Runtime</Label>
+                <Select v-model="aiSettings.CURSOR_RUNTIME">
+                  <SelectTrigger>
+                    <SelectValue placeholder="local" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="local">local</SelectItem>
+                    <SelectItem value="cloud">cloud</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div class="grid gap-2">
+                <Label>Local CWD</Label>
+                <Input v-model="aiSettings.CURSOR_LOCAL_CWD" placeholder="." />
+              </div>
+              <div class="grid gap-2">
+                <Label>Cloud Repos</Label>
+                <Input
+                  v-model="aiSettings.CURSOR_CLOUD_REPOS"
+                  placeholder="https://github.com/org/repo,..."
+                />
+              </div>
+            </template>
+
+            <template v-else>
+              <div class="grid gap-2">
+                <Label>API Base URL</Label>
+                <Input v-model="aiSettings.OPENAI_BASE_URL" placeholder="https://api.openai.com/v1" />
+              </div>
+              <div class="grid gap-2">
+                <Label>API Key</Label>
+                <Input
+                  v-model="aiSettings.OPENAI_API_KEY"
+                  type="password"
+                  :placeholder="t('settings.ai.keyPlaceholder')"
+                />
+                <p class="text-xs text-gray-500">
+                  {{ systemStatus?.env_file.openai_api_key_set ? t('settings.ai.keyConfigured') : t('settings.ai.keyMissing') }}
+                </p>
+              </div>
+              <div class="grid gap-2">
+                <Label>{{ t('settings.ai.modelName') }}</Label>
+                <Input v-model="aiSettings.OPENAI_MODEL_NAME" placeholder="gpt-3.5-turbo" />
+              </div>
+              <div class="grid gap-2">
+                <Label>{{ t('settings.ai.proxy') }}</Label>
+                <Input v-model="aiSettings.PROXY_URL" placeholder="http://127.0.0.1:7890" />
+              </div>
+            </template>
           </CardContent>
           <CardContent v-else class="py-8 text-sm text-gray-500">
             {{ t('settings.ai.loading') }}

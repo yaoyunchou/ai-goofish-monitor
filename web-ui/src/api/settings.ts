@@ -53,9 +53,15 @@ export interface NotificationTestResponse {
 }
 
 export interface AiSettings {
+  AI_PROVIDER?: 'openai' | 'cursor'
   OPENAI_API_KEY?: string
   OPENAI_BASE_URL?: string
   OPENAI_MODEL_NAME?: string
+  CURSOR_API_KEY?: string
+  CURSOR_MODEL_NAME?: string
+  CURSOR_RUNTIME?: 'local' | 'cloud'
+  CURSOR_LOCAL_CWD?: string
+  CURSOR_CLOUD_REPOS?: string
   PROXY_URL?: string
 }
 
@@ -85,9 +91,12 @@ export interface SystemStatus {
   }
   env_file: {
     exists: boolean
+    ai_provider?: string
     openai_api_key_set: boolean
     openai_base_url_set: boolean
     openai_model_name_set: boolean
+    cursor_api_key_set?: boolean
+    cursor_model_name_set?: boolean
     ntfy_topic_url_set: boolean
     gotify_url_set: boolean
     gotify_token_set: boolean

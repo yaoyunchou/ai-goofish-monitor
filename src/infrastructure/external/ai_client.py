@@ -16,6 +16,7 @@ from src.ai_message_builder import (
 )
 from src.infrastructure.config.settings import AISettings
 from src.infrastructure.config.env_manager import env_manager
+from src.infrastructure.external.cursor_transport import CursorAITransport
 from src.services.ai_request_compat import (
     CHAT_COMPLETIONS_API_MODE,
     RESPONSES_API_MODE,
@@ -72,6 +73,7 @@ class AIClient:
     def __init__(self):
         self.settings: Optional[AISettings] = None
         self.client: Optional[AsyncOpenAI] = None
+        self.cursor_transport: Optional[CursorAITransport] = None
         self.refresh()
 
     def _load_settings(self) -> None:
@@ -80,12 +82,19 @@ class AIClient:
 
     def refresh(self) -> None:
         self._load_settings()
-        self.client = self._initialize_client()
-
-    def _initialize_client(self) -> Optional[AsyncOpenAI]:
-        """初始化 OpenAI 客户端"""
+        self.client = None
+        self.cursor_transport = None
         if not self.settings or not self.settings.is_configured():
             print("警告：AI 配置不完整，AI 功能将不可用")
+            return
+        if self.settings.normalized_provider() == "cursor":
+            self.cursor_transport = CursorAITransport(self.settings)
+            return
+        self.client = self._initialize_openai_client()
+
+    def _initialize_openai_client(self) -> Optional[AsyncOpenAI]:
+        """初始化 OpenAI 兼容客户端"""
+        if not self.settings or not self.settings.is_openai_configured():
             return None
 
         try:
@@ -101,15 +110,22 @@ class AIClient:
                 base_url=self.settings.base_url
             )
         except Exception as e:
-            print(f"初始化 AI 客户端失败: {e}")
+            print(f"初始化 OpenAI 客户端失败: {e}")
             return None
 
     def is_available(self) -> bool:
         """检查 AI 客户端是否可用"""
+        if self.settings and self.settings.normalized_provider() == "cursor":
+            return self.cursor_transport is not None
         return self.client is not None
 
     async def close(self) -> None:
         """关闭底层异步客户端，避免事件循环结束后再触发清理。"""
+        cursor_transport = getattr(self, "cursor_transport", None)
+        self.cursor_transport = None
+        if cursor_transport is not None:
+            await cursor_transport.close()
+
         client = self.client
         self.client = None
         if client is None:
@@ -178,6 +194,11 @@ class AIClient:
         user_content = build_user_message_content(text_prompt, image_data_urls)
         return [{"role": "user", "content": user_content}]
 
+    def _provider_name(self) -> str:
+        if self.settings and hasattr(self.settings, "normalized_provider"):
+            return self.settings.normalized_provider()
+        return "openai"
+
     async def _call_ai(
         self,
         messages: List[Dict],
@@ -187,6 +208,19 @@ class AIClient:
         enable_json_output: Optional[bool] = None,
     ) -> str:
         """调用 AI API"""
+        if self._provider_name() == "cursor":
+            if not self.cursor_transport:
+                raise RuntimeError("Cursor AI transport is not initialized")
+            use_response_format = (
+                self.settings.enable_response_format
+                if enable_json_output is None
+                else enable_json_output
+            )
+            return await self.cursor_transport.complete(
+                messages,
+                enable_json_output=use_response_format,
+            )
+
         api_mode = CHAT_COMPLETIONS_API_MODE
         use_response_format = (
             self.settings.enable_response_format
