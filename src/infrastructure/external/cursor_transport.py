@@ -4,6 +4,7 @@ Cursor SDK transport for AI completions.
 from __future__ import annotations
 
 import os
+import subprocess
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from cursor_sdk import (
@@ -62,7 +63,7 @@ class CursorAITransport:
         return response_text
 
     def _build_agent_options(self) -> AgentOptions:
-        runtime = (self.settings.cursor_runtime or "local").strip().lower()
+        runtime = self.settings.effective_cursor_runtime()
         options_kwargs: Dict[str, Any] = {
             "model": self.settings.cursor_model_name,
             "api_key": self.settings.cursor_api_key,
@@ -77,6 +78,8 @@ class CursorAITransport:
 
     def _build_cloud_options(self) -> CloudAgentOptions:
         repos = self._parse_cloud_repos(self.settings.cursor_cloud_repos)
+        if not repos:
+            repos = self._parse_cloud_repos(_detect_git_remote_repo_url())
         if repos:
             return CloudAgentOptions(repos=repos)
         return CloudAgentOptions()
@@ -158,3 +161,33 @@ def _data_url_to_sdk_image(data_url: str) -> SDKImage:
     if header.startswith("data:"):
         mime_type = header[5:].split(";", 1)[0] or mime_type
     return SDKImage.data_image(encoded, mime_type)
+
+
+def _detect_git_remote_repo_url() -> str:
+    """Best-effort origin URL for Cursor CloudAgentOptions (github.com/org/repo)."""
+    try:
+        raw = subprocess.check_output(
+            ["git", "config", "--get", "remote.origin.url"],
+            cwd=os.getcwd(),
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return ""
+    return _normalize_repo_url_for_cursor(raw)
+
+
+def _normalize_repo_url_for_cursor(remote_url: str) -> str:
+    url = (remote_url or "").strip()
+    if not url:
+        return ""
+    if url.startswith("git@"):
+        host_path = url[4:]
+        host, _, path = host_path.partition(":")
+        path = path.removesuffix(".git")
+        return f"{host}/{path}" if host and path else ""
+    url = url.removesuffix(".git")
+    for prefix in ("https://", "http://"):
+        if url.startswith(prefix):
+            return url[len(prefix) :]
+    return url

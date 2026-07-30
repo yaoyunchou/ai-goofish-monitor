@@ -69,7 +69,7 @@ CURSOR_RUNTIME=local
 # local 模式工作目录（默认项目根目录）
 CURSOR_LOCAL_CWD=.
 
-# cloud 模式可选：逗号分隔的 GitHub 仓库 URL
+# cloud 模式可选：逗号分隔的 GitHub 仓库 URL；留空则自动读取 git origin
 CURSOR_CLOUD_REPOS=
 ```
 
@@ -79,6 +79,9 @@ CURSOR_CLOUD_REPOS=
 |------|--------|------|
 | **local** | `CURSOR_RUNTIME=local` | 使用本机 Cursor 运行时；需安装 Cursor IDE/CLI，适合本地开发 |
 | **cloud** | `CURSOR_RUNTIME=cloud` | 使用 Cursor Cloud Agent；适合无本地 Cursor 环境的服务器/Docker |
+| **自动** | `CURSOR_RUNTIME` 留空 | 在 Cursor Cloud Agent 虚拟机内（`CURSOR_AGENT=1`）自动使用 **cloud**，否则为 **local** |
+
+未配置 `CURSOR_CLOUD_REPOS` 时，cloud 模式会尝试从当前仓库的 `git remote.origin.url` 推断 GitHub 仓库地址。
 
 ### Web UI 配置
 

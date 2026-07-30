@@ -78,6 +78,32 @@ def test_ai_settings_cursor_provider_configuration():
     assert settings.active_model_name() == "composer-2.5"
 
 
+def test_effective_cursor_runtime_auto_cloud_in_cursor_agent(monkeypatch):
+    monkeypatch.delenv("CURSOR_RUNTIME", raising=False)
+    monkeypatch.setenv("CURSOR_AGENT", "1")
+    settings = AISettings(cursor_runtime="")
+    assert settings.effective_cursor_runtime() == "cloud"
+
+
+def test_effective_cursor_runtime_respects_explicit_local(monkeypatch):
+    monkeypatch.setenv("CURSOR_AGENT", "1")
+    settings = AISettings(cursor_runtime="local")
+    assert settings.effective_cursor_runtime() == "local"
+
+
+def test_normalize_repo_url_for_cursor():
+    from src.infrastructure.external.cursor_transport import _normalize_repo_url_for_cursor
+
+    assert (
+        _normalize_repo_url_for_cursor("git@github.com:yaoyunchou/ai-goofish-monitor.git")
+        == "github.com/yaoyunchou/ai-goofish-monitor"
+    )
+    assert (
+        _normalize_repo_url_for_cursor("https://github.com/org/repo.git")
+        == "github.com/org/repo"
+    )
+
+
 def test_ai_client_uses_cursor_transport_when_provider_is_cursor(monkeypatch):
     from src.infrastructure.external.ai_client import AIClient
 

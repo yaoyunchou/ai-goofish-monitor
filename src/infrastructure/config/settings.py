@@ -47,7 +47,7 @@ class AISettings(_EnvSettings):
     model_name: str = _env_field("", "OPENAI_MODEL_NAME")
     cursor_api_key: Optional[str] = _env_field(None, "CURSOR_API_KEY")
     cursor_model_name: str = _env_field("composer-2.5", "CURSOR_MODEL_NAME")
-    cursor_runtime: str = _env_field("local", "CURSOR_RUNTIME")
+    cursor_runtime: str = _env_field("", "CURSOR_RUNTIME")
     cursor_local_cwd: str = _env_field(".", "CURSOR_LOCAL_CWD")
     cursor_cloud_repos: Optional[str] = _env_field(None, "CURSOR_CLOUD_REPOS")
     proxy_url: Optional[str] = _env_field(None, "PROXY_URL")
@@ -76,6 +76,15 @@ class AISettings(_EnvSettings):
         if self.normalized_provider() == "cursor":
             return self.cursor_model_name
         return self.model_name
+
+    def effective_cursor_runtime(self) -> str:
+        """Resolve Cursor SDK runtime; auto-select cloud inside Cursor Cloud Agent."""
+        raw = (self.cursor_runtime or "").strip().lower()
+        if raw in {"local", "cloud"}:
+            return raw
+        if os.getenv("CURSOR_AGENT") == "1":
+            return "cloud"
+        return "local"
 
 
 class NotificationSettings(_EnvSettings):

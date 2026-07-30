@@ -270,7 +270,8 @@ async def get_ai_settings():
         "OPENAI_BASE_URL": env_manager.get_value("OPENAI_BASE_URL", ""),
         "OPENAI_MODEL_NAME": env_manager.get_value("OPENAI_MODEL_NAME", ""),
         "CURSOR_MODEL_NAME": env_manager.get_value("CURSOR_MODEL_NAME", "composer-2.5"),
-        "CURSOR_RUNTIME": env_manager.get_value("CURSOR_RUNTIME", "local"),
+        "CURSOR_RUNTIME": env_manager.get_value("CURSOR_RUNTIME", ""),
+        "CURSOR_RUNTIME_EFFECTIVE": AISettings().effective_cursor_runtime(),
         "CURSOR_LOCAL_CWD": env_manager.get_value("CURSOR_LOCAL_CWD", "."),
         "CURSOR_CLOUD_REPOS": env_manager.get_value("CURSOR_CLOUD_REPOS", ""),
         "SKIP_AI_ANALYSIS": env_manager.get_value("SKIP_AI_ANALYSIS", "false").lower() == "true",
@@ -321,7 +322,9 @@ async def test_ai_settings(settings: dict):
             submitted_api_key = settings.get("CURSOR_API_KEY", "")
             api_key = submitted_api_key or stored_api_key
             model_name = settings.get("CURSOR_MODEL_NAME") or env_manager.get_value("CURSOR_MODEL_NAME", "composer-2.5")
-            runtime = settings.get("CURSOR_RUNTIME") or env_manager.get_value("CURSOR_RUNTIME", "local")
+            runtime = settings.get("CURSOR_RUNTIME")
+            if runtime is None:
+                runtime = env_manager.get_value("CURSOR_RUNTIME", "")
             local_cwd = settings.get("CURSOR_LOCAL_CWD") or env_manager.get_value("CURSOR_LOCAL_CWD", ".")
             cloud_repos = settings.get("CURSOR_CLOUD_REPOS") or env_manager.get_value("CURSOR_CLOUD_REPOS", "")
             cursor_settings = AISettings(

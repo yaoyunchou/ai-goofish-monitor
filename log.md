@@ -1,5 +1,15 @@
 # 变更日志
 
+## 2026-07-30
+
+### chore(ai): 同步 Cursor SDK 分支并增强 Cloud Agent 适配
+
+- 基于 `origin/cursor/cursor-sdk-integration-d454` 继续开发（工作分支 `cursor/sync-cursor-sdk-dc12`）
+- `AISettings.effective_cursor_runtime()`：`CURSOR_RUNTIME` 留空且在 `CURSOR_AGENT=1` 时自动使用 `cloud`
+- `cursor_transport`：cloud 模式在未配置 `CURSOR_CLOUD_REPOS` 时从 `git remote.origin.url` 推断仓库
+- `.env.example`：`CURSOR_RUNTIME` 默认留空并补充说明；`docs/ai-provider.md`、`AGENTS.md` 更新
+- 设置 API 返回 `CURSOR_RUNTIME_EFFECTIVE`；补充单元测试
+
 ## 2026-07-28
 
 ### docs: 新增 docs 目录与详细使用文档
