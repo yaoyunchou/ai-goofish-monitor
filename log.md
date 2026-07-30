@@ -2,7 +2,11 @@
 
 ## 2026-07-30
 
-### chore(ai): 同步 Cursor SDK 分支并增强 Cloud Agent 适配
+### fix(ai): 适配 cursor-sdk 1.0.26 AsyncClient 桥接调用
+
+- `cursor_transport` 通过 `AsyncClient.launch_bridge` + `AsyncAgent.prompt(..., client=)` 调用
+- 单元测试 mock 同步更新
+
 
 - 基于 `origin/cursor/cursor-sdk-integration-d454` 继续开发（工作分支 `cursor/sync-cursor-sdk-dc12`）
 - `AISettings.effective_cursor_runtime()`：`CURSOR_RUNTIME` 留空且在 `CURSOR_AGENT=1` 时自动使用 `cloud`

@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from cursor_sdk import (
     AgentOptions,
     AsyncAgent,
+    AsyncClient,
     CloudAgentOptions,
     CloudRepository,
     LocalAgentOptions,
@@ -48,10 +49,17 @@ class CursorAITransport:
         if images:
             user_message = UserMessage(text=text, images=images)
 
-        result = await AsyncAgent.prompt(
-            user_message,
-            self._build_agent_options(),
-        )
+        workspace = self._resolve_local_cwd()
+        self._apply_api_key_env()
+        async with await AsyncClient.launch_bridge(
+            workspace=workspace,
+            allow_api_key_env_fallback=True,
+        ) as client:
+            result = await AsyncAgent.prompt(
+                user_message,
+                self._build_agent_options(),
+                client=client,
+            )
         status = getattr(result, "status", None)
         if status in {"error", "cancelled", "expired"}:
             raise RuntimeError(
@@ -89,6 +97,11 @@ class CursorAITransport:
         path = os.path.abspath(configured)
         os.makedirs(path, exist_ok=True)
         return path
+
+    def _apply_api_key_env(self) -> None:
+        api_key = (self.settings.cursor_api_key or "").strip()
+        if api_key:
+            os.environ["CURSOR_API_KEY"] = api_key
 
     @staticmethod
     def _parse_cloud_repos(raw_value: Optional[str]) -> List[CloudRepository]:

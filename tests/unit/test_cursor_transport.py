@@ -46,7 +46,7 @@ def test_cursor_transport_complete_uses_async_agent_prompt(monkeypatch):
         status = "finished"
         result = '{"is_recommended": true, "reason": "ok"}'
 
-    async def fake_prompt(message, options):
+    async def fake_prompt(message, options, **kwargs):
         captured["message"] = message
         captured["options"] = options
         return FakeResult()
@@ -54,6 +54,21 @@ def test_cursor_transport_complete_uses_async_agent_prompt(monkeypatch):
     monkeypatch.setattr(
         "src.infrastructure.external.cursor_transport.AsyncAgent.prompt",
         fake_prompt,
+    )
+
+    class _FakeClient:
+        async def __aenter__(self):
+            return object()
+
+        async def __aexit__(self, *args):
+            return None
+
+    async def fake_launch_bridge(*args, **kwargs):
+        return _FakeClient()
+
+    monkeypatch.setattr(
+        "src.infrastructure.external.cursor_transport.AsyncClient.launch_bridge",
+        fake_launch_bridge,
     )
 
     response = asyncio.run(
