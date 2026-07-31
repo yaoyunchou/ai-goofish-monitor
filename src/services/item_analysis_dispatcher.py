@@ -12,6 +12,7 @@ from src.keyword_rule_engine import build_search_text, evaluate_keyword_rules
 from src.services.listing_ai_filter import (
     build_filter_analysis_result,
     filter_listing_by_ai,
+    heuristic_listing_filter,
 )
 
 
@@ -105,6 +106,13 @@ class ItemAnalysisDispatcher:
             keyword_hit_count = int(keyword_result.get("keyword_hit_count") or 0)
             if not keyword_result.get("is_recommended"):
                 return keyword_result
+
+        heuristic = heuristic_listing_filter(record)
+        if heuristic is not None and not heuristic.get("is_target_product"):
+            return build_filter_analysis_result(
+                heuristic,
+                keyword_hit_count=keyword_hit_count,
+            )
 
         if self._should_run_listing_filter(job):
             filter_outcome = await self._run_listing_filter(job, record)

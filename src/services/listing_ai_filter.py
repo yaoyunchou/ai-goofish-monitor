@@ -7,7 +7,7 @@ import json
 import os
 from typing import Any, Dict, List, Optional
 
-from src.config import ENABLE_RESPONSE_FORMAT, MODEL_NAME
+from src.config import ENABLE_RESPONSE_FORMAT
 from src.ai_message_builder import build_user_message_content
 from src.infrastructure.external.ai_client import AIClient
 from src.services.ai_response_parser import parse_ai_response_json
@@ -23,6 +23,49 @@ _VALID_CATEGORIES = frozenset(
         "other",
     }
 )
+
+
+def heuristic_listing_filter(record: dict) -> Optional[Dict[str, Any]]:
+    """
+    无需调用 AI 的标题规则：闲鱼常见「充电线/数据线 + 长度 SKU」而无关充电头。
+  返回与 AI 过滤相同结构的 payload，无法判断时返回 None。
+    """
+    item = record.get("商品信息", {}) or {}
+    title = str(item.get("商品标题") or "").strip()
+    if not title:
+        return None
+
+    cable_markers = ("数据线", "快充线", "充电线", "电源线", "转接线", "充电线器")
+    charger_markers = (
+        "充电头",
+        "充电器",
+        "氮化镓充电器",
+        "氮化镓充电头",
+        "pd充电头",
+        "gan充电",
+        "单头",
+        "三口",
+        "双口",
+        "插头",
+    )
+
+    has_cable_hint = any(marker in title for marker in cable_markers)
+    if not has_cable_hint:
+        return None
+
+    has_charger_hint = any(marker in title for marker in charger_markers)
+    has_length_option = "长度:" in title or "长度：" in title
+
+    if has_charger_hint and not has_length_option:
+        return None
+
+    if has_cable_hint and (has_length_option or not has_charger_hint):
+        return {
+            "is_target_product": False,
+            "detected_category": "data_cable_only",
+            "reason": "标题含数据线/充电线特征且未见充电头描述（规则预检）",
+        }
+    return None
 
 
 def _load_filter_system_template() -> str:
@@ -113,6 +156,10 @@ async def filter_listing_by_ai(
     """
     调用 AI 做轻量品类判断。失败返回 None（调用方决定是否放行）。
     """
+    heuristic = heuristic_listing_filter(record)
+    if heuristic is not None:
+        return heuristic
+
     from src.ai_handler import encode_image_to_base64
 
     client = ai_client or AIClient()
