@@ -122,6 +122,7 @@ def test_item_analysis_dispatcher_supports_keyword_mode_without_ai():
                 seller_id="seller-1",
                 zhima_credit_text="优秀",
                 registration_duration_text="来闲鱼1年",
+                enable_ai_listing_filter=False,
             )
         )
         await dispatcher.join()

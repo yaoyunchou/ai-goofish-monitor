@@ -20,6 +20,7 @@ from src.ai_handler import (
 )
 from src.config import (
     AI_DEBUG_MODE,
+    AI_LISTING_FILTER_ENABLED,
     DETAIL_API_URL_PATTERN,
     LOGIN_IS_EDGE,
     RUN_HEADLESS,
@@ -244,6 +245,15 @@ def _get_seller_profile_cache_ttl(task_config: dict) -> int:
     configured = task_config.get("seller_profile_cache_ttl")
     default = _as_int(os.getenv("SELLER_PROFILE_CACHE_TTL"), 1800)
     return max(0, _as_int(configured, default))
+
+
+def _ai_listing_filter_enabled(task_config: dict) -> bool:
+    configured = task_config.get("enable_ai_listing_filter")
+    if configured is False:
+        return False
+    if configured is True:
+        return True
+    return AI_LISTING_FILTER_ENABLED
 
 
 def _default_context_options() -> dict:
@@ -1097,6 +1107,12 @@ async def scrape_xianyu(task_config: dict, debug_limit: int = 0):
                                         seller_id=str(user_id) if user_id else None,
                                         zhima_credit_text=zhima_credit_text,
                                         registration_duration_text=registration_duration_text,
+                                        purchase_intent=str(
+                                            task_config.get("description") or ""
+                                        ).strip(),
+                                        enable_ai_listing_filter=_ai_listing_filter_enabled(
+                                            task_config
+                                        ),
                                     )
                                 )
 
