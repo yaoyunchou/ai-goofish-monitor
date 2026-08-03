@@ -8,7 +8,7 @@
 - 任务/结果/收录/行情读写统一走 `db_connection()`，Postgres 使用 `ON CONFLICT` 方言
 - 依赖：`psycopg[binary]>=3.1.18`
 - 测试环境强制 `DATABASE_DRIVER=sqlite`
-
+- 验证脚本：`python3 -m scripts.verify_database`
 
 - `docs/database-supabase-integration.md`（项目 wkhatdhgohkpsqkytotz 连接串与 checklist）
 - `supabase/migrations/20260803120000_initial_goofish_schema.sql`
