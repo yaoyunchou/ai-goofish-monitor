@@ -7,6 +7,12 @@
 - 环境变量 `AI_LISTING_FILTER_ENABLED`（默认 `true`）；任务级可用 `enable_ai_listing_filter` 覆盖
 - 购买意图取自任务 `description`（空则回退搜索 `keyword`）；过滤阶段最多下载 2 张图辅助识别
 
+### feat(collections): 收录商品并拉取全量 SKU 价格
+
+- `src/services/collection_service.py`、`item_sku_fetch_service.py`、`parsers/item_detail_parser.py`
+- API：`/api/collections`（收录、详情、刷新 SKU）
+- 结果列表项附带 `_result_item_id` 字段
+
 ## 2026-07-31
 
 ### chore(tasks): 机乐堂 30W 任务改为 AI 判定并补充 criteria

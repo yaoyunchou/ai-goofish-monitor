@@ -129,7 +129,7 @@ def _load_filtered_records_from_conn(
     order_clause = _sort_expression(sort_by, sort_order)
     rows = conn.execute(
         f"""
-        SELECT raw_json, status
+        SELECT id, result_filename, item_id, raw_json, status
         FROM result_items
         WHERE {where_clause}
         ORDER BY {order_clause}
@@ -141,6 +141,8 @@ def _load_filtered_records_from_conn(
     records: list[dict] = []
     for row in rows:
         record = _parse_raw_record(str(row["raw_json"]), status=row["status"])
+        record["_result_item_id"] = int(row["id"])
+        record["_result_filename"] = row["result_filename"]
         decorated = _decorate_record_visibility(record, row["status"], blacklist_keywords)
         if include_hidden or _is_record_visible(decorated):
             records.append(decorated)

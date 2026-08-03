@@ -1,5 +1,14 @@
 # Web UI 变更日志
 
+## 2026-08-03
+
+### feat(results): 结果页收录与 SKU 详情
+
+- 结果卡片新增「收录」按钮，收录后跳转 `/results/collected/:id`
+- 后端 `collected_items` 表 + `/api/collections`：收录后 Playwright 拉取详情页 SKU/价格
+- 收录详情页展示规格表格，支持重新拉取 SKU
+- 结果 API 返回 `_result_item_id` / `_result_filename` 供收录定位
+
 ## 2026-07-30
 
 ### chore(ai): Cursor SDK 分支同步与 Cloud 运行时

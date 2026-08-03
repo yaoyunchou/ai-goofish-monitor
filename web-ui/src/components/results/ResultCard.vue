@@ -10,11 +10,15 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import Badge from '@/components/ui/badge/Badge.vue'
-import { ExternalLink, TrendingUp, TrendingDown, Info, User, Clock, CheckCircle2, XCircle, AlertCircle, EyeOff, Eye } from 'lucide-vue-next'
+import { ExternalLink, TrendingUp, TrendingDown, Info, User, Clock, CheckCircle2, XCircle, AlertCircle, EyeOff, Eye, Bookmark } from 'lucide-vue-next'
 import { formatDateTime } from '@/i18n'
+import { useRouter } from 'vue-router'
+import * as collectionsApi from '@/api/collections'
+import { toast } from '@/components/ui/toast'
 
 interface Props {
   item: ResultItem
+  resultFilename?: string | null
 }
 
 const props = defineProps<Props>()
@@ -22,6 +26,9 @@ const emit = defineEmits<{
   (e: 'toggle-block', item: ResultItem): void
 }>()
 const { t } = useI18n()
+const router = useRouter()
+
+const isCollecting = ref(false)
 
 const info = props.item.商品信息
 const seller = props.item.卖家信息
@@ -50,6 +57,38 @@ const hiddenLabel = computed(() => {
 })
 
 const expanded = ref(false)
+
+async function handleCollect() {
+  const itemId = info.商品ID
+  const filename = props.resultFilename || props.item._result_filename
+  const resultItemId = props.item._result_item_id
+  if (!itemId || (!filename && !resultItemId)) {
+    toast({
+      title: t('collections.collectFailed'),
+      description: t('collections.missingIdentifiers'),
+      variant: 'destructive',
+    })
+    return
+  }
+  isCollecting.value = true
+  try {
+    const res = await collectionsApi.collectResultItem({
+      result_item_id: resultItemId,
+      result_filename: filename || undefined,
+      item_id: String(itemId),
+    })
+    toast({ title: t('collections.collectSuccess') })
+    await router.push({ name: 'CollectionDetail', params: { id: res.collection.id } })
+  } catch (error: any) {
+    toast({
+      title: t('collections.collectFailed'),
+      description: error?.message || String(error),
+      variant: 'destructive',
+    })
+  } finally {
+    isCollecting.value = false
+  }
+}
 </script>
 
 <template>
@@ -78,6 +117,15 @@ const expanded = ref(false)
         </Badge>
       </div>
       <div class="absolute top-3 right-3 flex gap-1.5">
+        <button
+          type="button"
+          :disabled="isCollecting"
+          @click="handleCollect"
+          :aria-label="t('collections.collect')"
+          class="flex rounded-full bg-white/30 p-1.5 text-white backdrop-blur-md border border-white/40 shadow-sm opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 hover:bg-white/50 disabled:opacity-60"
+        >
+          <Bookmark class="w-4 h-4" />
+        </button>
         <button
           v-if="canToggleBlock"
           type="button"

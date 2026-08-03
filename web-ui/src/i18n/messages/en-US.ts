@@ -15,6 +15,7 @@ const enUS = {
     tasks: 'Tasks',
     accounts: 'Accounts',
     results: 'Results',
+    collectionDetail: 'Collection Detail',
     logs: 'Logs',
     settings: 'Settings',
   },

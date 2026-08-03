@@ -157,7 +157,12 @@ async function handleSaveBlacklistRules() {
 
     <ResultsInsightsPanel :insights="insights" :selected-task-label="selectedTaskLabel" />
 
-    <ResultsGrid :results="results" :is-loading="isLoading" @toggle-block="toggleItemBlock" />
+    <ResultsGrid
+      :results="results"
+      :result-filename="selectedFile"
+      :is-loading="isLoading"
+      @toggle-block="toggleItemBlock"
+    />
 
     <Dialog v-model:open="isDeleteDialogOpen">
       <DialogContent class="sm:max-w-[420px]">
