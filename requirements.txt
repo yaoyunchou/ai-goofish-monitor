@@ -17,3 +17,4 @@ qrcode
 pytest
 pytest-asyncio
 coverage
+psycopg[binary]>=3.1.18

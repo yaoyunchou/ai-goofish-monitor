@@ -8,8 +8,14 @@ import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from src.infrastructure.persistence.sqlite_bootstrap import bootstrap_sqlite_storage
-from src.infrastructure.persistence.sqlite_connection import sqlite_connection
+from src.infrastructure.persistence.database_config import is_postgres
+from src.infrastructure.persistence.db_connection import db_connection
+from src.infrastructure.persistence.sql_dialect import (
+    insert_collected_item_sql,
+    json_text,
+    parse_json_field,
+)
+from src.infrastructure.persistence.storage_bootstrap import bootstrap_storage
 from src.services.item_sku_fetch_service import fetch_item_skus
 
 
@@ -17,7 +23,7 @@ def _row_to_collection(row, record: Optional[dict] = None) -> Dict[str, Any]:
     sku_payload = {}
     if row["sku_json"]:
         try:
-            sku_payload = json.loads(row["sku_json"])
+            sku_payload = parse_json_field(row["sku_json"], default={})
         except json.JSONDecodeError:
             sku_payload = {}
     return {
@@ -44,7 +50,7 @@ def _load_result_record_by_id(conn, result_item_id: int) -> Optional[dict]:
     ).fetchone()
     if row is None:
         return None
-    return json.loads(row["raw_json"])
+    return parse_json_field(row["raw_json"], default={})
 
 
 def _find_result_item_id(conn, result_filename: str, item_id: str) -> Optional[int]:
@@ -82,8 +88,8 @@ def _upsert_collection_sync(
     result_filename: Optional[str],
     item_id: Optional[str],
 ) -> int:
-    bootstrap_sqlite_storage()
-    with sqlite_connection() as conn:
+    bootstrap_storage()
+    with db_connection() as conn:
         resolved_id = result_item_id
         if resolved_id is None:
             if not result_filename or not item_id:
@@ -101,14 +107,13 @@ def _upsert_collection_sync(
 
         now = datetime.now().isoformat()
         cursor = conn.execute(
-            """
-            INSERT INTO collected_items (
-                result_item_id, collected_at, sku_fetch_status
-            ) VALUES (?, ?, 'pending')
-            """,
+            insert_collected_item_sql(),
             (resolved_id, now),
         )
         conn.commit()
+        if is_postgres():
+            row = cursor.fetchone()
+            return int(row["id"])
         return int(cursor.lastrowid)
 
 
@@ -117,9 +122,9 @@ async def list_collections() -> List[Dict[str, Any]]:
 
 
 def _list_collections_sync() -> List[Dict[str, Any]]:
-    bootstrap_sqlite_storage()
+    bootstrap_storage()
     items: List[Dict[str, Any]] = []
-    with sqlite_connection() as conn:
+    with db_connection() as conn:
         rows = conn.execute(
             """
             SELECT c.*, r.title, r.price_display, r.link, r.item_id, r.result_filename
@@ -147,8 +152,8 @@ async def get_collection(collection_id: int) -> Optional[Dict[str, Any]]:
 
 
 def _get_collection_sync(collection_id: int) -> Optional[Dict[str, Any]]:
-    bootstrap_sqlite_storage()
-    with sqlite_connection() as conn:
+    bootstrap_storage()
+    with db_connection() as conn:
         row = conn.execute(
             "SELECT * FROM collected_items WHERE id = ?",
             (collection_id,),
@@ -174,8 +179,8 @@ async def delete_collection(collection_id: int) -> bool:
 
 
 def _delete_collection_sync(collection_id: int) -> bool:
-    bootstrap_sqlite_storage()
-    with sqlite_connection() as conn:
+    bootstrap_storage()
+    with db_connection() as conn:
         cursor = conn.execute(
             "DELETE FROM collected_items WHERE id = ?",
             (collection_id,),
@@ -185,8 +190,8 @@ def _delete_collection_sync(collection_id: int) -> bool:
 
 
 async def refresh_collection_skus(collection_id: int) -> Dict[str, Any]:
-    bootstrap_sqlite_storage()
-    with sqlite_connection() as conn:
+    bootstrap_storage()
+    with db_connection() as conn:
         row = conn.execute(
             """
             SELECT c.id, c.result_item_id, r.link, r.title
@@ -215,7 +220,7 @@ async def refresh_collection_skus(collection_id: int) -> Dict[str, Any]:
         status = "failed"
         error = str(exc)
 
-    with sqlite_connection() as conn:
+    with db_connection() as conn:
         conn.execute(
             """
             UPDATE collected_items
@@ -225,7 +230,7 @@ async def refresh_collection_skus(collection_id: int) -> Dict[str, Any]:
             (
                 status,
                 datetime.now().isoformat(),
-                json.dumps(sku_payload, ensure_ascii=False),
+                json_text(sku_payload),
                 error,
                 collection_id,
             ),
@@ -237,6 +242,6 @@ async def refresh_collection_skus(collection_id: int) -> Dict[str, Any]:
 
 
 def lookup_result_item_id(result_filename: str, item_id: str) -> Optional[int]:
-    bootstrap_sqlite_storage()
-    with sqlite_connection() as conn:
+    bootstrap_storage()
+    with db_connection() as conn:
         return _find_result_item_id(conn, result_filename, item_id)

@@ -11,8 +11,14 @@ from datetime import datetime
 from statistics import median
 from typing import Any, Iterable, Optional
 
-from src.infrastructure.persistence.sqlite_bootstrap import bootstrap_sqlite_storage
-from src.infrastructure.persistence.sqlite_connection import sqlite_connection
+from src.infrastructure.persistence.db_connection import db_connection
+from src.infrastructure.persistence.sql_dialect import (
+    insert_collected_item_sql,
+    insert_price_snapshot_ignore_sql,
+    json_text,
+    parse_json_field,
+)
+from src.infrastructure.persistence.storage_bootstrap import bootstrap_storage
 
 PRICE_HISTORY_DIR = "price_history"
 DEFAULT_HISTORY_WINDOW_DAYS = 30
@@ -122,18 +128,12 @@ def record_market_snapshots(
     if not records:
         return []
 
-    bootstrap_sqlite_storage()
+    bootstrap_storage()
     keyword_slug = normalize_keyword_slug(keyword)
-    with sqlite_connection() as conn:
+    with db_connection() as conn:
         for record in records:
             conn.execute(
-                """
-                INSERT OR IGNORE INTO price_snapshots (
-                    keyword_slug, keyword, task_name, snapshot_time, snapshot_day,
-                    run_id, item_id, title, price, price_display, tags_json, region,
-                    seller, publish_time, link
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
+                insert_price_snapshot_ignore_sql(),
                 (
                     keyword_slug,
                     record.get("keyword", keyword),
@@ -145,7 +145,7 @@ def record_market_snapshots(
                     record.get("title", ""),
                     record.get("price"),
                     record.get("price_display", ""),
-                    json.dumps(record.get("tags") or [], ensure_ascii=False),
+                    json_text(record.get("tags") or []),
                     record.get("region", ""),
                     record.get("seller", ""),
                     record.get("publish_time", ""),
@@ -157,8 +157,8 @@ def record_market_snapshots(
 
 
 def load_price_snapshots(keyword: str) -> list[dict]:
-    bootstrap_sqlite_storage()
-    with sqlite_connection() as conn:
+    bootstrap_storage()
+    with db_connection() as conn:
         rows = conn.execute(
             """
             SELECT *
@@ -181,7 +181,7 @@ def load_price_snapshots(keyword: str) -> list[dict]:
                 "title": row["title"],
                 "price": row["price"],
                 "price_display": row["price_display"],
-                "tags": json.loads(row["tags_json"] or "[]"),
+                "tags": parse_json_field(row["tags_json"], default=[]),
                 "region": row["region"],
                 "seller": row["seller"],
                 "publish_time": row["publish_time"],
@@ -192,8 +192,8 @@ def load_price_snapshots(keyword: str) -> list[dict]:
 
 
 def delete_price_snapshots(keyword: str) -> int:
-    bootstrap_sqlite_storage()
-    with sqlite_connection() as conn:
+    bootstrap_storage()
+    with db_connection() as conn:
         cursor = conn.execute(
             "DELETE FROM price_snapshots WHERE keyword_slug = ?",
             (normalize_keyword_slug(keyword),),

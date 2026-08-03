@@ -8,7 +8,7 @@ import contextlib
 import re
 
 from src.config import STATE_FILE
-from src.infrastructure.persistence.sqlite_task_repository import SqliteTaskRepository
+from src.infrastructure.persistence.task_repository_factory import create_task_repository
 from src.scraper import scrape_xianyu
 
 
@@ -42,7 +42,7 @@ async def main():
         except (json.JSONDecodeError, IOError) as e:
             sys.exit(f"错误: 读取或解析配置文件 '{args.config}' 失败: {e}")
     else:
-        repository = SqliteTaskRepository()
+        repository = create_task_repository()
         tasks = await repository.find_all()
         tasks_config = [task.dict() for task in tasks]
 

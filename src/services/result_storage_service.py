@@ -8,8 +8,14 @@ import hashlib
 import json
 from datetime import datetime
 
-from src.infrastructure.persistence.sqlite_bootstrap import bootstrap_sqlite_storage
-from src.infrastructure.persistence.sqlite_connection import sqlite_connection
+from src.infrastructure.persistence.db_connection import db_connection
+from src.infrastructure.persistence.sql_dialect import (
+    as_sql_bool,
+    insert_result_item_ignore_sql,
+    json_text,
+    sql_true_condition,
+)
+from src.infrastructure.persistence.storage_bootstrap import bootstrap_storage
 from src.infrastructure.persistence.storage_names import build_result_filename
 from src.services.price_history_service import parse_price_value
 from src.services.result_blacklist_service import (
@@ -40,6 +46,12 @@ def _fallback_unique_key(record: dict, item: dict) -> str:
     return f"hash:{digest}"
 
 
+def _raw_json_text(value) -> str:
+    if isinstance(value, str):
+        return value
+    return json.dumps(value, ensure_ascii=False)
+
+
 def _parse_raw_record(raw_json: str, *, status: str | None = None) -> dict:
     record = json.loads(raw_json)
     if status is not None:
@@ -56,11 +68,11 @@ def _build_query_conditions(
     conditions = ["result_filename = ?"]
     params: list = [filename]
     if ai_recommended_only:
-        conditions.append("is_recommended = 1")
+        conditions.append(sql_true_condition("is_recommended"))
         conditions.append("analysis_source = ?")
         params.append("ai")
     if keyword_recommended_only:
-        conditions.append("is_recommended = 1")
+        conditions.append(sql_true_condition("is_recommended"))
         conditions.append("analysis_source = ?")
         params.append("keyword")
     return " AND ".join(conditions), params
@@ -140,7 +152,7 @@ def _load_filtered_records_from_conn(
 
     records: list[dict] = []
     for row in rows:
-        record = _parse_raw_record(str(row["raw_json"]), status=row["status"])
+        record = _parse_raw_record(_raw_json_text(row["raw_json"]), status=row["status"])
         record["_result_item_id"] = int(row["id"])
         record["_result_filename"] = row["result_filename"]
         decorated = _decorate_record_visibility(record, row["status"], blacklist_keywords)
@@ -154,7 +166,7 @@ async def save_result_record(record: dict, keyword: str) -> bool:
 
 
 def _save_result_record_sync(record: dict, keyword: str) -> bool:
-    bootstrap_sqlite_storage()
+    bootstrap_storage()
     item = record.get("商品信息", {}) or {}
     analysis = record.get("ai_analysis", {}) or {}
     link = str(item.get("商品链接") or "")
@@ -165,15 +177,9 @@ def _save_result_record_sync(record: dict, keyword: str) -> bool:
     except (TypeError, ValueError):
         keyword_hit_count = 0
 
-    with sqlite_connection() as conn:
+    with db_connection() as conn:
         conn.execute(
-            """
-            INSERT OR IGNORE INTO result_items (
-                result_filename, keyword, task_name, crawl_time, publish_time, price,
-                price_display, item_id, title, link, link_unique_key, seller_nickname,
-                is_recommended, analysis_source, keyword_hit_count, raw_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
+            insert_result_item_ignore_sql(),
             (
                 build_result_filename(keyword),
                 record.get("搜索关键字", keyword),
@@ -187,10 +193,10 @@ def _save_result_record_sync(record: dict, keyword: str) -> bool:
                 link,
                 link_unique_key,
                 (record.get("卖家信息", {}) or {}).get("卖家昵称") or item.get("卖家昵称"),
-                1 if analysis.get("is_recommended") else 0,
+                as_sql_bool(analysis.get("is_recommended")),
                 analysis.get("analysis_source"),
                 keyword_hit_count,
-                json.dumps(record, ensure_ascii=False),
+                json_text(record),
             ),
         )
         conn.commit()
@@ -198,9 +204,9 @@ def _save_result_record_sync(record: dict, keyword: str) -> bool:
 
 
 def load_processed_link_keys(keyword: str) -> set[str]:
-    bootstrap_sqlite_storage()
+    bootstrap_storage()
     filename = build_result_filename(keyword)
-    with sqlite_connection() as conn:
+    with db_connection() as conn:
         rows = conn.execute(
             "SELECT link_unique_key FROM result_items WHERE result_filename = ?",
             (filename,),
@@ -213,8 +219,8 @@ async def list_result_filenames() -> list[str]:
 
 
 def _list_result_filenames_sync() -> list[str]:
-    bootstrap_sqlite_storage()
-    with sqlite_connection() as conn:
+    bootstrap_storage()
+    with db_connection() as conn:
         rows = conn.execute(
             """
             SELECT result_filename, MAX(crawl_time) AS latest_crawl_time
@@ -231,8 +237,8 @@ async def result_file_exists(filename: str) -> bool:
 
 
 def _result_file_exists_sync(filename: str) -> bool:
-    bootstrap_sqlite_storage()
-    with sqlite_connection() as conn:
+    bootstrap_storage()
+    with db_connection() as conn:
         row = conn.execute(
             "SELECT 1 FROM result_items WHERE result_filename = ? LIMIT 1",
             (filename,),
@@ -245,8 +251,8 @@ async def delete_result_file_records(filename: str) -> int:
 
 
 def _delete_result_file_records_sync(filename: str) -> int:
-    bootstrap_sqlite_storage()
-    with sqlite_connection() as conn:
+    bootstrap_storage()
+    with db_connection() as conn:
         cursor = conn.execute(
             "DELETE FROM result_items WHERE result_filename = ?",
             (filename,),
@@ -289,9 +295,9 @@ def _query_result_records_sync(
     limit: int,
     include_hidden: bool,
 ) -> tuple[int, list[dict]]:
-    bootstrap_sqlite_storage()
+    bootstrap_storage()
     offset = max(page - 1, 0) * limit
-    with sqlite_connection() as conn:
+    with db_connection() as conn:
         records = _load_filtered_records_from_conn(
             conn,
             filename=filename,
@@ -333,8 +339,8 @@ def _load_all_result_records_sync(
     sort_order: str,
     include_hidden: bool,
 ) -> list[dict]:
-    bootstrap_sqlite_storage()
-    with sqlite_connection() as conn:
+    bootstrap_storage()
+    with db_connection() as conn:
         return _load_filtered_records_from_conn(
             conn,
             filename=filename,
@@ -351,13 +357,13 @@ async def build_result_ndjson(filename: str) -> str:
 
 
 def _build_result_ndjson_sync(filename: str) -> str:
-    bootstrap_sqlite_storage()
-    with sqlite_connection() as conn:
+    bootstrap_storage()
+    with db_connection() as conn:
         rows = conn.execute(
             "SELECT raw_json FROM result_items WHERE result_filename = ? ORDER BY id ASC",
             (filename,),
         ).fetchall()
-    return "\n".join(str(row["raw_json"]) for row in rows)
+    return "\n".join(_raw_json_text(row["raw_json"]) for row in rows)
 
 
 async def load_result_summary(filename: str) -> dict | None:
@@ -365,8 +371,8 @@ async def load_result_summary(filename: str) -> dict | None:
 
 
 def _load_result_summary_sync(filename: str) -> dict | None:
-    bootstrap_sqlite_storage()
-    with sqlite_connection() as conn:
+    bootstrap_storage()
+    with db_connection() as conn:
         visible_records = _load_filtered_records_from_conn(
             conn,
             filename=filename,
@@ -412,8 +418,8 @@ async def update_item_status(filename: str, item_id: str, status: str) -> bool:
 
 
 def _update_item_status_sync(filename: str, item_id: str, status: str) -> bool:
-    bootstrap_sqlite_storage()
-    with sqlite_connection() as conn:
+    bootstrap_storage()
+    with db_connection() as conn:
         cursor = conn.execute(
             "UPDATE result_items SET status = ? WHERE result_filename = ? AND item_id = ?",
             (status, filename, item_id),
@@ -427,8 +433,8 @@ async def load_result_blacklist_keywords(filename: str) -> list[str]:
 
 
 def _load_result_blacklist_keywords_sync(filename: str) -> list[str]:
-    bootstrap_sqlite_storage()
-    with sqlite_connection() as conn:
+    bootstrap_storage()
+    with db_connection() as conn:
         return _load_blacklist_keywords_from_conn(conn, filename)
 
 
@@ -437,10 +443,10 @@ async def save_result_blacklist_keywords(filename: str, keywords: list[str]) -> 
 
 
 def _save_result_blacklist_keywords_sync(filename: str, keywords: list[str]) -> list[str]:
-    bootstrap_sqlite_storage()
+    bootstrap_storage()
     normalized_keywords = normalize_blacklist_keywords(keywords)
     now = datetime.now().isoformat()
-    with sqlite_connection() as conn:
+    with db_connection() as conn:
         conn.execute(
             """
             INSERT INTO result_blacklist_rules (
@@ -457,8 +463,8 @@ def _save_result_blacklist_keywords_sync(filename: str, keywords: list[str]) -> 
 
 
 def load_visible_result_item_ids(filename: str) -> set[str]:
-    bootstrap_sqlite_storage()
-    with sqlite_connection() as conn:
+    bootstrap_storage()
+    with db_connection() as conn:
         visible_records = _load_filtered_records_from_conn(
             conn,
             filename=filename,
