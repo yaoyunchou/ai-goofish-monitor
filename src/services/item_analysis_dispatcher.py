@@ -9,6 +9,11 @@ from dataclasses import dataclass
 from typing import Awaitable, Callable, Optional
 
 from src.keyword_rule_engine import build_search_text, evaluate_keyword_rules
+from src.services.listing_ai_filter import (
+    build_filter_analysis_result,
+    filter_listing_by_ai,
+    heuristic_listing_filter,
+)
 
 
 SellerLoader = Callable[[str], Awaitable[dict]]
@@ -30,6 +35,8 @@ class ItemAnalysisJob:
     seller_id: Optional[str]
     zhima_credit_text: Optional[str]
     registration_duration_text: str
+    purchase_intent: str = ""
+    enable_ai_listing_filter: bool = True
 
 
 class ItemAnalysisDispatcher:
@@ -91,11 +98,97 @@ class ItemAnalysisDispatcher:
         return merged
 
     async def _build_analysis_result(self, job: ItemAnalysisJob, record: dict) -> dict:
+        keyword_result: Optional[dict] = None
+        keyword_hit_count = 0
+
         if job.decision_mode == "keyword":
-            return self._build_keyword_result(job, record)
+            keyword_result = self._build_keyword_result(job, record)
+            keyword_hit_count = int(keyword_result.get("keyword_hit_count") or 0)
+            if not keyword_result.get("is_recommended"):
+                return keyword_result
+
+        heuristic = heuristic_listing_filter(record)
+        if heuristic is not None and not heuristic.get("is_target_product"):
+            return build_filter_analysis_result(
+                heuristic,
+                keyword_hit_count=keyword_hit_count,
+            )
+
+        if self._should_run_listing_filter(job):
+            filter_outcome = await self._run_listing_filter(job, record)
+            if filter_outcome is not None:
+                if not filter_outcome.get("is_recommended"):
+                    return filter_outcome
+                if job.decision_mode == "keyword" and keyword_result is not None:
+                    return self._merge_keyword_with_filter(keyword_result, filter_outcome)
+
+        if job.decision_mode == "keyword" and keyword_result is not None:
+            return keyword_result
+
         if self._skip_ai_analysis:
             return self._build_skip_ai_result()
         return await self._run_ai_analysis(job, record)
+
+    def _should_run_listing_filter(self, job: ItemAnalysisJob) -> bool:
+        if self._skip_ai_analysis:
+            return False
+        if not job.enable_ai_listing_filter:
+            return False
+        intent = str(job.purchase_intent or "").strip()
+        if job.decision_mode == "ai" and not intent:
+            return False
+        return True
+
+    async def _run_listing_filter(
+        self, job: ItemAnalysisJob, record: dict
+    ) -> Optional[dict]:
+        image_paths = await self._download_filter_images(job, record)
+        filter_payload = await filter_listing_by_ai(
+            record,
+            purchase_intent=job.purchase_intent or job.keyword,
+            image_paths=image_paths,
+            max_images=2,
+        )
+        self._cleanup_images(image_paths)
+        if filter_payload is None:
+            print("   [AI品类过滤] 未执行或失败，继续后续分析链路。")
+            return None
+        keyword_hits = 0
+        if job.decision_mode == "keyword":
+            keyword_hits = int(
+                evaluate_keyword_rules(list(job.keyword_rules), build_search_text(record)).get(
+                    "keyword_hit_count"
+                )
+                or 0
+            )
+        return build_filter_analysis_result(
+            filter_payload,
+            keyword_hit_count=keyword_hits,
+        )
+
+    async def _download_filter_images(
+        self, job: ItemAnalysisJob, record: dict
+    ) -> list[str]:
+        item_data = record.get("商品信息", {}) or {}
+        image_urls = item_data.get("商品图片列表", [])
+        if not image_urls:
+            return []
+        return await self._image_downloader(
+            str(item_data.get("商品ID") or ""),
+            image_urls[:2],
+            job.task_name,
+        )
+
+    def _merge_keyword_with_filter(
+        self, keyword_result: dict, filter_result: dict
+    ) -> dict:
+        merged = copy.deepcopy(keyword_result)
+        merged["analysis_source"] = "keyword+ai_filter"
+        merged["filter"] = filter_result.get("filter")
+        filter_reason = filter_result.get("reason") or ""
+        if filter_reason:
+            merged["reason"] = f"{keyword_result.get('reason', '')}；{filter_reason}".strip("；")
+        return merged
 
     def _build_keyword_result(self, job: ItemAnalysisJob, record: dict) -> dict:
         search_text = build_search_text(record)

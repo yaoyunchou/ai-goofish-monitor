@@ -2,10 +2,12 @@ import os
 import sys
 
 from dotenv import load_dotenv
-from openai import AsyncOpenAI
+
+from src.infrastructure.config.settings import AISettings
 
 # --- AI & Notification Configuration ---
 load_dotenv()
+_ai_runtime_settings = AISettings()
 
 # --- File Paths & Directories ---
 STATE_FILE = "xianyu_state.json"
@@ -23,7 +25,8 @@ DETAIL_API_URL_PATTERN = "h5api.m.goofish.com/h5/mtop.taobao.idle.pc.detail"
 # --- Environment Variables ---
 API_KEY = os.getenv("OPENAI_API_KEY")
 BASE_URL = os.getenv("OPENAI_BASE_URL")
-MODEL_NAME = os.getenv("OPENAI_MODEL_NAME")
+MODEL_NAME = _ai_runtime_settings.active_model_name()
+AI_PROVIDER = _ai_runtime_settings.normalized_provider()
 PROXY_URL = os.getenv("PROXY_URL")
 NTFY_TOPIC_URL = os.getenv("NTFY_TOPIC_URL")
 GOTIFY_URL = os.getenv("GOTIFY_URL")
@@ -44,6 +47,7 @@ LOGIN_IS_EDGE = os.getenv("LOGIN_IS_EDGE", "false").lower() == "true"
 RUNNING_IN_DOCKER = os.getenv("RUNNING_IN_DOCKER", "false").lower() == "true"
 AI_DEBUG_MODE = os.getenv("AI_DEBUG_MODE", "false").lower() == "true"
 SKIP_AI_ANALYSIS = os.getenv("SKIP_AI_ANALYSIS", "false").lower() == "true"
+AI_LISTING_FILTER_ENABLED = os.getenv("AI_LISTING_FILTER_ENABLED", "true").lower() == "true"
 ENABLE_THINKING = os.getenv("ENABLE_THINKING", "false").lower() == "true"
 ENABLE_RESPONSE_FORMAT = os.getenv("ENABLE_RESPONSE_FORMAT", "true").lower() == "true"
 
@@ -57,33 +61,26 @@ IMAGE_DOWNLOAD_HEADERS = {
 }
 
 # --- Client Initialization ---
-# 检查配置是否齐全
-if not all([BASE_URL, MODEL_NAME]):
+class _AIClientAvailability:
+    def __bool__(self) -> bool:
+        return AISettings().is_configured()
+
+
+# 兼容旧代码中的 `if not client` 判断
+client = _AIClientAvailability()
+
+if not client and AI_PROVIDER == "openai":
     print("警告：未在 .env 文件中完整设置 OPENAI_BASE_URL 和 OPENAI_MODEL_NAME。AI相关功能可能无法使用。")
-    client = None
-else:
-    try:
-        if PROXY_URL:
-            print(f"正在为AI请求使用HTTP/S代理: {PROXY_URL}")
-            # httpx 会自动从环境变量中读取代理设置
-            os.environ['HTTP_PROXY'] = PROXY_URL
-            os.environ['HTTPS_PROXY'] = PROXY_URL
+elif not client and AI_PROVIDER == "cursor":
+    print("警告：未在 .env 文件中完整设置 CURSOR_API_KEY 和 CURSOR_MODEL_NAME。AI相关功能可能无法使用。")
 
-        # openai 客户端内部的 httpx 会自动从环境变量中获取代理配置
-        client = AsyncOpenAI(api_key=API_KEY, base_url=BASE_URL)
-    except Exception as e:
-        print(f"初始化 OpenAI 客户端时出错: {e}")
-        client = None
-
-# 检查AI客户端是否成功初始化
 if not client:
-    # 在 prompt_generator.py 中，如果 client 为 None，会直接报错退出
-    # 在 spider_v2.py 中，AI分析会跳过
-    # 为了保持一致性，这里只打印警告，具体逻辑由调用方处理
     pass
 
 # 检查关键配置
-if not all([BASE_URL, MODEL_NAME]) and 'prompt_generator.py' in sys.argv[0]:
+if not client and 'prompt_generator.py' in sys.argv[0]:
+    if AI_PROVIDER == "cursor":
+        sys.exit("错误：请确保在 .env 文件中完整设置了 CURSOR_API_KEY 和 CURSOR_MODEL_NAME。")
     sys.exit("错误：请确保在 .env 文件中完整设置了 OPENAI_BASE_URL 和 OPENAI_MODEL_NAME。(OPENAI_API_KEY 对于某些服务是可选的)")
 
 def get_ai_request_params(**kwargs):

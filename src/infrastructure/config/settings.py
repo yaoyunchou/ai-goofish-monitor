@@ -28,6 +28,7 @@ if _USING_PYDANTIC_SETTINGS:
             env_file_encoding="utf-8",
             extra="ignore",
             protected_namespaces=(),
+            populate_by_name=True,
         )
 else:
     class _EnvSettings(BaseSettings):
@@ -40,18 +41,50 @@ else:
 
 class AISettings(_EnvSettings):
     """AI模型配置"""
+    provider: str = _env_field("openai", "AI_PROVIDER")
     api_key: Optional[str] = _env_field(None, "OPENAI_API_KEY")
     base_url: str = _env_field("", "OPENAI_BASE_URL")
     model_name: str = _env_field("", "OPENAI_MODEL_NAME")
+    cursor_api_key: Optional[str] = _env_field(None, "CURSOR_API_KEY")
+    cursor_model_name: str = _env_field("composer-2.5", "CURSOR_MODEL_NAME")
+    cursor_runtime: str = _env_field("", "CURSOR_RUNTIME")
+    cursor_local_cwd: str = _env_field(".", "CURSOR_LOCAL_CWD")
+    cursor_cloud_repos: Optional[str] = _env_field(None, "CURSOR_CLOUD_REPOS")
     proxy_url: Optional[str] = _env_field(None, "PROXY_URL")
     debug_mode: bool = _env_field(False, "AI_DEBUG_MODE")
     enable_response_format: bool = _env_field(True, "ENABLE_RESPONSE_FORMAT")
     enable_thinking: bool = _env_field(False, "ENABLE_THINKING")
     skip_analysis: bool = _env_field(False, "SKIP_AI_ANALYSIS")
 
+    def normalized_provider(self) -> str:
+        provider = (self.provider or "openai").strip().lower()
+        return provider if provider in {"openai", "cursor"} else "openai"
+
+    def is_openai_configured(self) -> bool:
+        return bool(self.base_url and self.model_name)
+
+    def is_cursor_configured(self) -> bool:
+        return bool(self.cursor_api_key and self.cursor_model_name)
+
     def is_configured(self) -> bool:
         """检查AI是否已正确配置"""
-        return bool(self.base_url and self.model_name)
+        if self.normalized_provider() == "cursor":
+            return self.is_cursor_configured()
+        return self.is_openai_configured()
+
+    def active_model_name(self) -> str:
+        if self.normalized_provider() == "cursor":
+            return self.cursor_model_name
+        return self.model_name
+
+    def effective_cursor_runtime(self) -> str:
+        """Resolve Cursor SDK runtime; auto-select cloud inside Cursor Cloud Agent."""
+        raw = (self.cursor_runtime or "").strip().lower()
+        if raw in {"local", "cloud"}:
+            return raw
+        if os.getenv("CURSOR_AGENT") == "1":
+            return "cloud"
+        return "local"
 
 
 class NotificationSettings(_EnvSettings):

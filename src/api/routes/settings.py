@@ -23,7 +23,7 @@ from src.services.ai_request_compat import (
     is_chat_completions_api_unsupported_error,
     is_responses_api_unsupported_error,
 )
-from src.services.ai_response_parser import extract_ai_response_content
+from src.infrastructure.external.cursor_transport import CursorAITransport
 from src.services.notification_config_service import (
     NotificationSettingsValidationError,
     build_configured_channels,
@@ -99,9 +99,15 @@ class NotificationTestRequest(BaseModel):
 class AISettingsModel(BaseModel):
     """AI设置模型"""
 
+    AI_PROVIDER: Optional[str] = None
     OPENAI_API_KEY: Optional[str] = None
     OPENAI_BASE_URL: Optional[str] = None
     OPENAI_MODEL_NAME: Optional[str] = None
+    CURSOR_API_KEY: Optional[str] = None
+    CURSOR_MODEL_NAME: Optional[str] = None
+    CURSOR_RUNTIME: Optional[str] = None
+    CURSOR_LOCAL_CWD: Optional[str] = None
+    CURSOR_CLOUD_REPOS: Optional[str] = None
     SKIP_AI_ANALYSIS: Optional[bool] = None
     PROXY_URL: Optional[str] = None
 
@@ -222,6 +228,8 @@ async def get_system_status(
     openai_api_key = env_manager.get_value("OPENAI_API_KEY", "")
     openai_base_url = env_manager.get_value("OPENAI_BASE_URL", "")
     openai_model_name = env_manager.get_value("OPENAI_MODEL_NAME", "")
+    cursor_api_key = env_manager.get_value("CURSOR_API_KEY", "")
+    cursor_model_name = env_manager.get_value("CURSOR_MODEL_NAME", "")
     ai_settings = AISettings()
     notification_settings = load_notification_settings()
     running_task_ids = [
@@ -243,9 +251,12 @@ async def get_system_status(
         },
         "env_file": {
             "exists": env_file_exists,
+            "ai_provider": ai_settings.normalized_provider(),
             "openai_api_key_set": bool(openai_api_key),
             "openai_base_url_set": bool(openai_base_url),
             "openai_model_name_set": bool(openai_model_name),
+            "cursor_api_key_set": bool(cursor_api_key),
+            "cursor_model_name_set": bool(cursor_model_name),
             **build_notification_status_flags(notification_settings),
         },
         "configured_notification_channels": build_configured_channels(notification_settings),
@@ -255,8 +266,14 @@ async def get_system_status(
 @router.get("/ai")
 async def get_ai_settings():
     return {
+        "AI_PROVIDER": env_manager.get_value("AI_PROVIDER", "openai"),
         "OPENAI_BASE_URL": env_manager.get_value("OPENAI_BASE_URL", ""),
         "OPENAI_MODEL_NAME": env_manager.get_value("OPENAI_MODEL_NAME", ""),
+        "CURSOR_MODEL_NAME": env_manager.get_value("CURSOR_MODEL_NAME", "composer-2.5"),
+        "CURSOR_RUNTIME": env_manager.get_value("CURSOR_RUNTIME", ""),
+        "CURSOR_RUNTIME_EFFECTIVE": AISettings().effective_cursor_runtime(),
+        "CURSOR_LOCAL_CWD": env_manager.get_value("CURSOR_LOCAL_CWD", "."),
+        "CURSOR_CLOUD_REPOS": env_manager.get_value("CURSOR_CLOUD_REPOS", ""),
         "SKIP_AI_ANALYSIS": env_manager.get_value("SKIP_AI_ANALYSIS", "false").lower() == "true",
         "PROXY_URL": env_manager.get_value("PROXY_URL", ""),
     }
@@ -265,12 +282,24 @@ async def get_ai_settings():
 @router.put("/ai")
 async def update_ai_settings(settings: AISettingsModel):
     updates = {}
+    if settings.AI_PROVIDER is not None:
+        updates["AI_PROVIDER"] = settings.AI_PROVIDER.strip().lower()
     if settings.OPENAI_API_KEY is not None:
         updates["OPENAI_API_KEY"] = settings.OPENAI_API_KEY
     if settings.OPENAI_BASE_URL is not None:
         updates["OPENAI_BASE_URL"] = settings.OPENAI_BASE_URL
     if settings.OPENAI_MODEL_NAME is not None:
         updates["OPENAI_MODEL_NAME"] = settings.OPENAI_MODEL_NAME
+    if settings.CURSOR_API_KEY is not None:
+        updates["CURSOR_API_KEY"] = settings.CURSOR_API_KEY
+    if settings.CURSOR_MODEL_NAME is not None:
+        updates["CURSOR_MODEL_NAME"] = settings.CURSOR_MODEL_NAME
+    if settings.CURSOR_RUNTIME is not None:
+        updates["CURSOR_RUNTIME"] = settings.CURSOR_RUNTIME
+    if settings.CURSOR_LOCAL_CWD is not None:
+        updates["CURSOR_LOCAL_CWD"] = settings.CURSOR_LOCAL_CWD
+    if settings.CURSOR_CLOUD_REPOS is not None:
+        updates["CURSOR_CLOUD_REPOS"] = settings.CURSOR_CLOUD_REPOS
     if settings.SKIP_AI_ANALYSIS is not None:
         updates["SKIP_AI_ANALYSIS"] = str(settings.SKIP_AI_ANALYSIS).lower()
     if settings.PROXY_URL is not None:
@@ -287,6 +316,36 @@ async def update_ai_settings(settings: AISettingsModel):
 async def test_ai_settings(settings: dict):
     """测试AI模型设置是否有效"""
     try:
+        provider = str(settings.get("AI_PROVIDER") or env_manager.get_value("AI_PROVIDER", "openai")).strip().lower()
+        if provider == "cursor":
+            stored_api_key = env_manager.get_value("CURSOR_API_KEY", "")
+            submitted_api_key = settings.get("CURSOR_API_KEY", "")
+            api_key = submitted_api_key or stored_api_key
+            model_name = settings.get("CURSOR_MODEL_NAME") or env_manager.get_value("CURSOR_MODEL_NAME", "composer-2.5")
+            runtime = settings.get("CURSOR_RUNTIME")
+            if runtime is None:
+                runtime = env_manager.get_value("CURSOR_RUNTIME", "")
+            local_cwd = settings.get("CURSOR_LOCAL_CWD") or env_manager.get_value("CURSOR_LOCAL_CWD", ".")
+            cloud_repos = settings.get("CURSOR_CLOUD_REPOS") or env_manager.get_value("CURSOR_CLOUD_REPOS", "")
+            cursor_settings = AISettings(
+                provider="cursor",
+                cursor_api_key=api_key,
+                cursor_model_name=model_name,
+                cursor_runtime=runtime,
+                cursor_local_cwd=local_cwd,
+                cursor_cloud_repos=cloud_repos,
+            )
+            transport = CursorAITransport(cursor_settings)
+            response_text = await transport.complete(
+                [{"role": "user", "content": AI_TEST_PROMPT}],
+                enable_json_output=False,
+            )
+            return {
+                "success": True,
+                "message": "Cursor SDK 连接测试成功！",
+                "response": response_text,
+            }
+
         from openai import OpenAI
         import httpx
 
@@ -334,6 +393,8 @@ async def test_ai_settings(settings: dict):
                     max_output_tokens=AI_TEST_MAX_OUTPUT_TOKENS,
                 ),
             )
+
+        from src.services.ai_response_parser import extract_ai_response_content
 
         return {
             "success": True,

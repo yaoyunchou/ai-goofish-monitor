@@ -122,6 +122,22 @@ SCHEMA_STATEMENTS = (
     CREATE INDEX IF NOT EXISTS idx_snapshots_keyword_item_time
     ON price_snapshots(keyword_slug, item_id, snapshot_time DESC)
     """,
+    """
+    CREATE TABLE IF NOT EXISTS collected_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        result_item_id INTEGER NOT NULL UNIQUE,
+        collected_at TEXT NOT NULL,
+        sku_fetch_status TEXT NOT NULL DEFAULT 'pending',
+        sku_fetched_at TEXT,
+        sku_json TEXT,
+        sku_error TEXT,
+        FOREIGN KEY (result_item_id) REFERENCES result_items(id) ON DELETE CASCADE
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_collected_items_collected_at
+    ON collected_items(collected_at DESC)
+    """,
 )
 
 

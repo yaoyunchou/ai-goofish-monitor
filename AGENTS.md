@@ -34,6 +34,6 @@
 - PR 需说明变更范围与影响模块；UI 变更在 `web-ui/` 提供截图；关联相关 Issue；提及配置或迁移步骤。
 
 ## 安全与配置提示
-- 复制 `.env.example` 为 `.env`，设置必填项 `OPENAI_API_KEY`、`OPENAI_BASE_URL`、`OPENAI_MODEL_NAME` 等。
+- 复制 `.env.example` 为 `.env`，设置 `AI_PROVIDER`（`openai` 或 `cursor`）及对应 API Key；OpenAI 兼容模式需 `OPENAI_*`，Cursor 模式需 `CURSOR_API_KEY` 等（见 `docs/ai-provider.md`）。
 - 不要提交真实凭据或 cookies（如 `state.json`）；Playwright 需本地浏览器，Docker 镜像已预装 Chromium。
 - Web 认证默认 `admin/admin123`，生产环境务必修改，推荐启用 HTTPS 并限制访问来源。

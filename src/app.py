@@ -17,6 +17,7 @@ from src.api.routes import (
     login_state,
     websocket,
     accounts,
+    collections,
 )
 from src.api.dependencies import (
     set_process_service,
@@ -109,6 +110,7 @@ app.include_router(logs.router)
 app.include_router(settings.router)
 app.include_router(prompts.router)
 app.include_router(results.router)
+app.include_router(collections.router)
 app.include_router(login_state.router)
 app.include_router(websocket.router)
 app.include_router(accounts.router)

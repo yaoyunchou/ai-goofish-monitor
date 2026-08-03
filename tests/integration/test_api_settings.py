@@ -323,6 +323,7 @@ def test_notification_test_endpoint_ignores_other_channel_dirty_fields(tmp_path,
 
 def test_ai_settings_fall_back_to_runtime_environment_when_env_file_missing(tmp_path, monkeypatch):
     _clear_settings_env(monkeypatch)
+    monkeypatch.delenv("CURSOR_AGENT", raising=False)
     env_file = tmp_path / ".env"
     monkeypatch.setattr(env_manager, "env_file", env_file)
     monkeypatch.setenv("OPENAI_API_KEY", "runtime-key")
@@ -333,9 +334,16 @@ def test_ai_settings_fall_back_to_runtime_environment_when_env_file_missing(tmp_
 
     ai_response = client.get("/api/settings/ai")
     assert ai_response.status_code == 200
-    assert ai_response.json() == {
+    payload = ai_response.json()
+    assert payload == {
+        "AI_PROVIDER": "openai",
         "OPENAI_BASE_URL": "https://runtime.example.com/v1",
         "OPENAI_MODEL_NAME": "runtime-model",
+        "CURSOR_MODEL_NAME": "composer-2.5",
+        "CURSOR_RUNTIME": "",
+        "CURSOR_RUNTIME_EFFECTIVE": "local",
+        "CURSOR_LOCAL_CWD": ".",
+        "CURSOR_CLOUD_REPOS": "",
         "SKIP_AI_ANALYSIS": False,
         "PROXY_URL": "http://127.0.0.1:7890",
     }

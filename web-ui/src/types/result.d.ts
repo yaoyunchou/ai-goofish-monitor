@@ -101,6 +101,8 @@ export interface ResultItem {
   "卖家信息": SellerInfo;
   ai_analysis: AiAnalysis;
   price_insight?: PriceInsight;
+  _result_item_id?: number;
+  _result_filename?: string;
   _status?: 'active' | 'hidden' | 'expired';
   _effective_hidden?: boolean;
   _hidden_reason?: 'manual' | 'rule' | 'expired' | null;

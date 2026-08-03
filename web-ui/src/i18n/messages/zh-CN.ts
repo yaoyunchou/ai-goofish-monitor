@@ -15,6 +15,7 @@ const zhCN = {
     tasks: '任务管理',
     accounts: '账号管理',
     results: '结果查看',
+    collectionDetail: '收录详情',
     logs: '运行日志',
     settings: '系统设置',
   },
