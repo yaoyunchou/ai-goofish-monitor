@@ -46,8 +46,8 @@ def test_lifespan_cleans_task_logs_on_startup(monkeypatch):
     monkeypatch.setattr(app_module, "scheduler_service", fake_scheduler)
     monkeypatch.setattr(app_module, "process_service", fake_process)
     monkeypatch.setattr(app_module, "TaskService", _FakeTaskService)
-    monkeypatch.setattr(app_module, "SqliteTaskRepository", lambda: object())
-    monkeypatch.setattr(app_module, "bootstrap_sqlite_storage", lambda: called.setdefault("bootstrapped", True))
+    monkeypatch.setattr(app_module, "create_task_repository", lambda: object())
+    monkeypatch.setattr(app_module, "bootstrap_storage", lambda: called.setdefault("bootstrapped", True))
     monkeypatch.setattr(
         app_module,
         "cleanup_task_logs",

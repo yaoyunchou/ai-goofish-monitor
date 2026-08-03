@@ -1,5 +1,23 @@
 # 变更日志
 
+## 2026-08-03
+
+### feat(db): DATABASE_DRIVER=postgres（Supabase / psycopg）
+
+- 新增 `database_config`、`db_connection`、`sql_dialect`、`storage_bootstrap`
+- 任务/结果/收录/行情读写统一走 `db_connection()`，Postgres 使用 `ON CONFLICT` 方言
+- 依赖：`psycopg[binary]>=3.1.18`
+- 测试环境强制 `DATABASE_DRIVER=sqlite`
+
+
+- `docs/database-supabase-integration.md`（项目 wkhatdhgohkpsqkytotz 连接串与 checklist）
+- `supabase/migrations/20260803120000_initial_goofish_schema.sql`
+- `.env.example` 增加 `DATABASE_DRIVER` / `DATABASE_URL`
+
+### docs: SQLite → MySQL 迁移计划
+
+- 新增 `docs/database-mysql-migration-plan.md`（现状盘点、分阶段 A～E、DDL/测试/风险 checklist）
+
 ### feat(scraper): 分析代理增加统一 AI 品类过滤（门禁）
 
 - 新增 `src/services/listing_ai_filter.py` 与 `prompts/listing_ai_filter_system.txt`

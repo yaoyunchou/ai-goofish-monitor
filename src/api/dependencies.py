@@ -9,7 +9,7 @@ from src.services.ai_service import AIAnalysisService
 from src.services.process_service import ProcessService
 from src.services.scheduler_service import SchedulerService
 from src.services.task_generation_service import TaskGenerationService
-from src.infrastructure.persistence.sqlite_task_repository import SqliteTaskRepository
+from src.infrastructure.persistence.task_repository_factory import create_task_repository
 from src.infrastructure.external.ai_client import AIClient
 
 
@@ -40,7 +40,7 @@ def set_task_generation_service(service: TaskGenerationService):
 # 服务依赖注入
 def get_task_service() -> TaskService:
     """获取任务管理服务实例"""
-    repository = SqliteTaskRepository()
+    repository = create_task_repository()
     return TaskService(repository)
 
 

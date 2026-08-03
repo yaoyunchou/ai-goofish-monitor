@@ -14,6 +14,14 @@ from fastapi.testclient import TestClient
 repo_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(repo_root))
 
+# 测试固定使用 SQLite，避免本机 .env 中 DATABASE_DRIVER=postgres 连真实库
+os.environ["DATABASE_DRIVER"] = "sqlite"
+os.environ.pop("DATABASE_URL", None)
+
+from src.infrastructure.persistence.database_config import get_database_driver
+
+get_database_driver.cache_clear()
+
 from src.api import dependencies as deps
 from src.api.routes import tasks
 from src.infrastructure.persistence.sqlite_task_repository import SqliteTaskRepository
