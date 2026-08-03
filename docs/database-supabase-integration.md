@@ -112,7 +112,14 @@ APP_DATABASE_FILE=data/app.sqlite3
 
 ## 6. 连通性自检（建表后）
 
-在已安装 `psycopg` 或 `asyncpg` 的机器上（密码勿泄露）：
+```bash
+pip install -r requirements.txt
+python3 -m scripts.verify_database
+```
+
+脚本会检查核心表行数并对 `app_metadata` 做读写探针（不打印密码）。
+
+在已安装 `psycopg` 的机器上（密码勿泄露）：
 
 ```bash
 # 使用控制台复制的 URI，或：
