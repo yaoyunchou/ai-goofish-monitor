@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 from playwright.async_api import async_playwright
 
 from src.config import DETAIL_API_URL_PATTERN, RUN_HEADLESS, STATE_FILE
-from src.parsers.item_detail_parser import (
+from src.item_detail_parser import (
     extract_skus_from_detail_payloads,
     parse_title_sku_fragments,
 )

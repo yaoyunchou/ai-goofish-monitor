@@ -1,6 +1,6 @@
 import pytest
 
-from src.parsers.item_detail_parser import (
+from src.item_detail_parser import (
     extract_skus_from_detail_payloads,
     parse_title_sku_fragments,
 )
