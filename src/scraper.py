@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import sys
 import random
 from datetime import datetime
 from typing import Optional
@@ -1185,7 +1186,7 @@ async def scrape_xianyu(task_config: dict, debug_limit: int = 0):
                     await analysis_dispatcher.join()
                 log_time("任务执行完毕，浏览器将在5秒后自动关闭...")
                 await asyncio.sleep(5)
-                if debug_limit:
+                if debug_limit and sys.stdin.isatty() and not RUN_HEADLESS:
                     input("按回车键关闭浏览器...")
                 await browser.close()
 
