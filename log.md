@@ -2,6 +2,12 @@
 
 ## 2026-08-04
 
+### chore(release): 合并 Postgres-only 与配置修复到 `master`
+
+- 将 `cursor/remove-sqlite-postgres-only-dc12` fast-forward 合入 `origin/master`（含 #6 / #7 对应改动）
+- 从仓库删除误提交的 `.env.20260803` / `.env.20260804`，并忽略 `.env.202608*`
+- 已关闭重复 PR #9（与 master 实现路径冲突，内容已由 dc12 分支覆盖）
+
 ### chore(tasks): 新增监控任务「机乐堂30w多口充电头」
 
 - 通过 API 写入 Supabase `tasks` 表（AI 判定、看图、价格 30–150、cron 每 2 小时）
@@ -28,8 +34,7 @@
 - `verify_database` 输出配置来源；密码失败与 IPv6 分开展示提示
 - `EnvManager.config_source()` 供运行时诊断
 - 测试使用 `data/.pytest-env`，避免仓库 `.env` 干扰
-- 保留 `.env.20260803` 作为测试环境配置备份（后续由你自行改密码/连接串）
-- 新增 `.env.20260804`：自当前 `/workspace/.env` 复制的配置快照
+- 本地可保留 `.env` 备份文件，但勿提交 Git（已加入 `.env.202608*` 忽略规则）
 
 ## 2026-08-03
 
