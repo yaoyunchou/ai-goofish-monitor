@@ -1,6 +1,4 @@
-"""
-基于 SQLite 的任务仓储实现。
-"""
+"""基于 Postgres 的任务仓储实现。"""
 from __future__ import annotations
 
 import asyncio
@@ -32,21 +30,16 @@ def find_task_by_name_sync(task_name: str) -> Task | None:
     bootstrap_storage()
     with db_connection() as conn:
         row = conn.execute(
-            "SELECT * FROM tasks WHERE task_name = ? ORDER BY id ASC LIMIT 1",
+            "SELECT * FROM tasks WHERE task_name = %s ORDER BY id ASC LIMIT 1",
             (task_name,),
         ).fetchone()
     return _row_to_task(row) if row else None
 
 
-class SqliteTaskRepository(TaskRepository):
-    """基于 SQLite 的任务仓储"""
+class DbTaskRepository(TaskRepository):
+    """基于 Postgres 的任务仓储"""
 
-    def __init__(
-        self,
-        db_path: str | None = None,
-        legacy_config_file: str | None = "config.json",
-    ):
-        self.db_path = db_path
+    def __init__(self, *, legacy_config_file: str | None = "config.json"):
         self.legacy_config_file = legacy_config_file
 
     async def find_all(self) -> List[Task]:
@@ -62,29 +55,20 @@ class SqliteTaskRepository(TaskRepository):
         return await asyncio.to_thread(self._delete_sync, task_id)
 
     def _find_all_sync(self) -> List[Task]:
-        bootstrap_storage(
-            self.db_path,
-            legacy_config_file=self.legacy_config_file,
-        )
-        with db_connection(self.db_path) as conn:
+        bootstrap_storage(legacy_config_file=self.legacy_config_file)
+        with db_connection() as conn:
             rows = conn.execute("SELECT * FROM tasks ORDER BY id ASC").fetchall()
         return [_row_to_task(row) for row in rows]
 
     def _find_by_id_sync(self, task_id: int) -> Optional[Task]:
-        bootstrap_storage(
-            self.db_path,
-            legacy_config_file=self.legacy_config_file,
-        )
-        with db_connection(self.db_path) as conn:
-            row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        bootstrap_storage(legacy_config_file=self.legacy_config_file)
+        with db_connection() as conn:
+            row = conn.execute("SELECT * FROM tasks WHERE id = %s", (task_id,)).fetchone()
         return _row_to_task(row) if row else None
 
     def _save_sync(self, task: Task) -> Task:
-        bootstrap_storage(
-            self.db_path,
-            legacy_config_file=self.legacy_config_file,
-        )
-        with db_connection(self.db_path) as conn:
+        bootstrap_storage(legacy_config_file=self.legacy_config_file)
+        with db_connection() as conn:
             task_id = task.id
             if task_id is None:
                 task_id = self._next_task_id(conn)
@@ -94,12 +78,9 @@ class SqliteTaskRepository(TaskRepository):
         return task.model_copy(update={"id": task_id})
 
     def _delete_sync(self, task_id: int) -> bool:
-        bootstrap_storage(
-            self.db_path,
-            legacy_config_file=self.legacy_config_file,
-        )
-        with db_connection(self.db_path) as conn:
-            cursor = conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+        bootstrap_storage(legacy_config_file=self.legacy_config_file)
+        with db_connection() as conn:
+            cursor = conn.execute("DELETE FROM tasks WHERE id = %s", (task_id,))
             conn.commit()
         return cursor.rowcount > 0
 

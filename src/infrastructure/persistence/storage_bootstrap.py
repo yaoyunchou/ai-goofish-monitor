@@ -1,5 +1,7 @@
-"""
-存储启动初始化与旧文件迁移（SQLite / Postgres）。
+"""存储启动初始化与旧文件迁移（Postgres）。
+
+首次启动时从遗留的 ``config.json`` / ``jsonl/`` / ``price_history/`` 一次性导入历史数据。
+导入进度通过 ``app_metadata`` 中的 bootstrap 标记记录，避免重复导入。
 """
 from __future__ import annotations
 
@@ -33,21 +35,17 @@ SNAPSHOTS_BOOTSTRAP_KEY = "bootstrap:legacy_price_snapshots"
 
 
 def bootstrap_storage(
-    db_path: str | None = None,
     *,
     legacy_config_file: str | None = LEGACY_CONFIG_FILE,
     legacy_result_dir: str = LEGACY_RESULT_DIR,
     legacy_price_history_dir: str = LEGACY_PRICE_HISTORY_DIR,
 ) -> None:
     with BOOTSTRAP_LOCK:
-        with db_connection(db_path) as conn:
+        with db_connection() as conn:
             ensure_schema(conn)
             _import_tasks_if_needed(conn, legacy_config_file)
             _import_results_if_needed(conn, legacy_result_dir)
             _import_price_snapshots_if_needed(conn, legacy_price_history_dir)
-
-
-bootstrap_sqlite_storage = bootstrap_storage
 
 
 def _table_is_empty(conn: DbConnection, table_name: str) -> bool:
@@ -93,7 +91,7 @@ def _import_tasks_if_needed(conn: DbConnection, legacy_config_file: str | None) 
                 ai_prompt_base_file, ai_prompt_criteria_file, account_state_file,
                 account_strategy, free_shipping, new_publish_option, region,
                 decision_mode, keyword_rules_json, is_running
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 index,
@@ -270,7 +268,7 @@ def _parse_price(value):
 
 def _bootstrap_completed(conn: DbConnection, key: str) -> bool:
     row = conn.execute(
-        "SELECT value FROM app_metadata WHERE key = ?",
+        "SELECT value FROM app_metadata WHERE key = %s",
         (key,),
     ).fetchone()
     return row is not None

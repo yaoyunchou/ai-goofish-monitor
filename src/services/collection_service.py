@@ -8,7 +8,6 @@ import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from src.infrastructure.persistence.database_config import is_postgres
 from src.infrastructure.persistence.db_connection import db_connection
 from src.infrastructure.persistence.sql_dialect import (
     insert_collected_item_sql,
@@ -111,10 +110,8 @@ def _upsert_collection_sync(
             (resolved_id, now),
         )
         conn.commit()
-        if is_postgres():
-            row = cursor.fetchone()
-            return int(row["id"])
-        return int(cursor.lastrowid)
+        row = cursor.fetchone()
+        return int(row["id"])
 
 
 async def list_collections() -> List[Dict[str, Any]]:

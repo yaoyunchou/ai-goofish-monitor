@@ -14,7 +14,7 @@ from typing import Awaitable, Callable, Dict, TextIO
 from src.ai_handler import send_ntfy_notification
 from src.config import STATE_FILE
 from src.failure_guard import FailureGuard
-from src.infrastructure.persistence.sqlite_task_repository import find_task_by_name_sync
+from src.infrastructure.persistence.task_repository import find_task_by_name_sync
 from src.utils import build_task_log_path
 
 STOP_TIMEOUT_SECONDS = 20

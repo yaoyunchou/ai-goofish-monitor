@@ -2,14 +2,34 @@
 
 ## 2026-08-04
 
-### fix(config): 数据库配置与 env_manager 统一（.env 优先于 Secrets）
+### feat(db): 彻底移除 SQLite，全面切换为 Postgres-only（基于 env-manager 分支）
+
+- 基于 `cursor/env-manager-database-config-dc12` 分支 rebase，保留其 `env_manager` 配置解析（`.env` 优先于进程环境/Secrets）
+- 删除 `src/infrastructure/persistence/sqlite_connection.py`、`sqlite_bootstrap.py`、`sqlite_task_repository.py`
+- 新增 `src/infrastructure/persistence/task_repository.py`（`DbTaskRepository`，原 `SqliteTaskRepository`），去除 `db_path` 参数，统一走 `DATABASE_URL`
+- `database_config.py`：在 env_manager 基础上移除 `DRIVER_SQLITE` / `get_sqlite_database_path` / 驱动分支，`get_database_driver()` 恒为 `postgres`；保留 `is_postgres()`（恒 True）兼容旧调用；`get_postgres_dsn` 经 env_manager 解析
+- `db_connection.py`：仅保留 `psycopg` 连接，删除 `sqlite3` 分支与 `sqlite_connection` 别名；`ensure_schema` 改为 no-op（schema 由 supabase migration 维护）
+- `sql_dialect.py`：折叠为 Postgres-only（`ON CONFLICT` / `RETURNING` / 布尔类型），移除 `is_postgres()` 分支
+- `storage_bootstrap.py`：移除 `db_path`、`bootstrap_sqlite_storage` 别名与 `_prepare_database_file`；占位符统一为 `%s`
+- `storage_names.py`：移除 `DEFAULT_DATABASE_PATH`（`data/app.sqlite3`）
+- `runtime_status.py`：移除 `DRIVER_SQLITE` / `get_sqlite_database_path` 引用，`database_driver` 恒为 postgres，`sqlite_path` 恒为 None
+- `task_repository_factory.py`、`process_service.py`：改用新仓储
+- `result_storage_service.py`：黑名单 JSONB 列改用 `parse_json_field` 读取（Postgres 返回原生 list/dict）
+- `collection_service.py`：移除 `is_postgres()` 分支，统一用 `RETURNING id`
+- 配置：`.env.example` 改为 Postgres 必填（`DATABASE_URL`），移除 `DATABASE_DRIVER` / `APP_DATABASE_FILE`；`docker-compose.yaml` 移除 `APP_DATABASE_FILE` 与 `./data` 挂载
+- 文档：`README.md` / `README_EN.md` / `docs/user-guide.md` / `docs/database-supabase-integration.md` 更新为 Postgres；删除已过时的 `docs/database-mysql-migration-plan.md`；supabase migration 注释去掉「与 SQLite schema 对齐」
+- 测试：`conftest.py` 改为通过 `TEST_DATABASE_URL` 写入 `data/.pytest-env`（env_manager 优先读它），`clean_db` fixture 每用例 TRUNCATE，未配置时 DB 用例自动 skip；`test_database_config.py` 改为 Postgres-only + env_manager；`test_api_dashboard.py` / `test_api_results.py` / `test_price_history_service.py` / `test_utils.py` / `test_process_service.py` / `tests/live/_support.py` 同步更新
+- 安全：删除该分支上误提交的 `.env.20260803` / `.env.20260804` 备份文件（含真实密钥，已在 origin 暴露，需轮换并清理历史）
+- 验证：本地起 PostgreSQL 16 + 应用 migration，`python -m scripts.verify_database` 通过，FastAPI 启动 + 任务 CRUD 端到端通过，`pytest` DB 相关用例全绿（无回归）
+
+> 部署须知：首次需在目标库执行 `supabase/migrations/20260803120000_initial_goofish_schema.sql`；历史 `data/app.sqlite3` 数据需手动导出导入（保留 `result_items.id` 以兼容 `collected_items` 外键）。
+
+### fix(config): 数据库配置与 env_manager 统一（.env 优先于 Secrets）（来自 env-manager 分支）
 
 - `database_config` 的 `DATABASE_DRIVER` / `DATABASE_URL` / `APP_DATABASE_FILE` 改为经 `env_manager.get_value` 解析，与 Web 设置、系统状态一致
 - `verify_database` 输出配置来源；密码失败与 IPv6 分开展示提示
 - `EnvManager.config_source()` 供运行时诊断
 - 测试使用 `data/.pytest-env`，避免仓库 `.env` 干扰
-- 保留 `.env.20260803` 作为测试环境配置备份（后续由你自行改密码/连接串）
-- 新增 `.env.20260804`：自当前 `/workspace/.env` 复制的配置快照
 
 ## 2026-08-03
 

@@ -1,5 +1,5 @@
 """
-结果数据的 SQLite 读写服务。
+结果数据的数据库读写服务。
 """
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from src.infrastructure.persistence.sql_dialect import (
     as_sql_bool,
     insert_result_item_ignore_sql,
     json_text,
+    parse_json_field,
     sql_true_condition,
 )
 from src.infrastructure.persistence.storage_bootstrap import bootstrap_storage
@@ -95,10 +96,7 @@ def _load_blacklist_keywords_from_conn(conn, filename: str) -> list[str]:
     ).fetchone()
     if row is None:
         return []
-    try:
-        payload = json.loads(row["blacklist_keywords_json"] or "[]")
-    except json.JSONDecodeError:
-        return []
+    payload = parse_json_field(row["blacklist_keywords_json"], default=[])
     return normalize_blacklist_keywords(payload)
 
 

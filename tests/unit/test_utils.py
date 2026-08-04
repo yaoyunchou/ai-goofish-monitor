@@ -25,7 +25,7 @@ def test_get_link_unique_key():
     assert get_link_unique_key(link) == "https://www.goofish.com/item?id=123"
 
 
-def test_save_to_jsonl(tmp_path, monkeypatch):
+def test_save_to_jsonl(tmp_path, monkeypatch, clean_db):
     monkeypatch.chdir(tmp_path)
     record = {
         "爬取时间": "2026-01-01T10:00:00",

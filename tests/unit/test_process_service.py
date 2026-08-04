@@ -26,7 +26,11 @@ class FakeProcess:
         self.finish(-9)
 
 
-def test_process_service_marks_task_stopped_when_process_exits(monkeypatch, tmp_path):
+def test_process_service_marks_task_stopped_when_process_exits(monkeypatch, tmp_path, clean_db):
+    # 隔离工作目录，避免 bootstrap 从仓库根的 config.json 导入真实任务
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "config.json").write_text("[]", encoding="utf-8")
+
     fake_process = FakeProcess(pid=4321)
     events = []
 

@@ -14,26 +14,43 @@ from fastapi.testclient import TestClient
 repo_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(repo_root))
 
-# 测试固定使用 SQLite，避免本机 .env 中 DATABASE_DRIVER=postgres 连真实库
+# 测试需要一个 Postgres 测试库，通过 TEST_DATABASE_URL 指定（勿复用生产库，会被清空）。
+# 通过 env_manager 注入到一个临时 .env 文件，使其优先于进程环境变量（含 Cursor Cloud Secrets）。
+# 未配置 TEST_DATABASE_URL 时，依赖数据库的用例会自动跳过，纯单元测试照常运行。
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "").strip()
+
 _pytest_env = repo_root / "data" / ".pytest-env"
 _pytest_env.parent.mkdir(parents=True, exist_ok=True)
-_pytest_env.write_text("DATABASE_DRIVER=sqlite\n", encoding="utf-8")
+_pytest_lines = []
+if TEST_DATABASE_URL:
+    _pytest_lines.append(f"DATABASE_URL={TEST_DATABASE_URL}")
+_pytest_env.write_text("\n".join(_pytest_lines) + "\n", encoding="utf-8")
 
 from src.infrastructure.config.env_manager import env_manager
 
 env_manager.env_file = _pytest_env
 
+# 避免本机/云端进程环境中的 DATABASE_URL 串连真实库
 os.environ.pop("DATABASE_URL", None)
 
 from src.infrastructure.persistence.database_config import get_database_driver
 
-get_database_driver.cache_clear()
-
 from src.api import dependencies as deps
 from src.api.routes import tasks
-from src.infrastructure.persistence.sqlite_task_repository import SqliteTaskRepository
+from src.infrastructure.persistence.task_repository import DbTaskRepository
 from src.services.task_service import TaskService
 from src.services.task_generation_service import TaskGenerationService
+
+
+# 需要在每个用例前清空的业务表（含外键依赖顺序）
+_TRUNCATE_TABLES = (
+    "collected_items",
+    "result_blacklist_rules",
+    "price_snapshots",
+    "result_items",
+    "tasks",
+    "app_metadata",
+)
 
 
 @pytest.fixture()
@@ -95,7 +112,6 @@ class FakeProcessService:
     def reindex_after_delete(self, deleted_task_id: int):
         self.reindexed.append(deleted_task_id)
 
-
 class FakeSchedulerService:
     def __init__(self):
         self.reload_calls = 0
@@ -115,15 +131,24 @@ class FakeSchedulerService:
 
 
 @pytest.fixture()
-def api_context(tmp_path):
+def clean_db():
+    """清空测试库业务表，为依赖数据库的用例提供干净环境。"""
+    if not TEST_DATABASE_URL:
+        pytest.skip("TEST_DATABASE_URL 未配置；需要可清空的 Postgres 测试库")
+    from src.infrastructure.persistence.db_connection import db_connection
+
+    with db_connection() as conn:
+        for table in _TRUNCATE_TABLES:
+            conn.execute(f"TRUNCATE TABLE {table} RESTART IDENTITY CASCADE")
+        conn.commit()
+
+
+@pytest.fixture()
+def api_context(tmp_path, clean_db):
     config_file = tmp_path / "config.json"
     config_file.write_text("[]", encoding="utf-8")
-    db_path = tmp_path / "app.sqlite3"
 
-    repository = SqliteTaskRepository(
-        db_path=str(db_path),
-        legacy_config_file=None,
-    )
+    repository = DbTaskRepository(legacy_config_file=None)
     task_service = TaskService(repository)
     process_service = FakeProcessService()
     scheduler_service = FakeSchedulerService()
@@ -162,7 +187,6 @@ def api_context(tmp_path):
     return {
         "app": app,
         "config_file": config_file,
-        "db_path": db_path,
         "process_service": process_service,
         "scheduler_service": scheduler_service,
         "task_generation_service": task_generation_service,

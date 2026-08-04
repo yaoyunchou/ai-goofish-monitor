@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from src.api import dependencies as deps
 from src.api.routes import dashboard
 from src.domain.models.task import TaskCreate
-from src.infrastructure.persistence.sqlite_task_repository import SqliteTaskRepository
+from src.infrastructure.persistence.task_repository import DbTaskRepository
 from src.services.task_service import TaskService
 
 
@@ -16,44 +16,19 @@ def _write_jsonl(path, records):
             file.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
-def test_dashboard_summary_aggregates_tasks_and_results(tmp_path, monkeypatch):
+def test_dashboard_summary_aggregates_tasks_and_results(tmp_path, monkeypatch, clean_db):
     monkeypatch.chdir(tmp_path)
 
     jsonl_dir = tmp_path / "jsonl"
     jsonl_dir.mkdir(parents=True, exist_ok=True)
 
-    repository = SqliteTaskRepository(
-        db_path=str(tmp_path / "app.sqlite3"),
-        legacy_config_file=None,
-    )
+    repository = DbTaskRepository(legacy_config_file=None)
     task_service = TaskService(repository)
     app = FastAPI()
     app.include_router(dashboard.router)
     app.dependency_overrides[deps.get_task_service] = lambda: task_service
 
     client = TestClient(app)
-
-    first = TaskCreate(
-      task_name="Apple Watch 任务",
-      keyword="apple watch",
-      description="只关注价格合适且成色好的 Apple Watch。",
-      max_pages=3,
-      personal_only=True,
-    )
-    second = TaskCreate(
-      task_name="iPad 任务",
-      keyword="ipad pro",
-      description="关注 2024 款 iPad Pro。",
-      max_pages=2,
-      personal_only=True,
-    )
-
-    created_first = task_service.create_task(first)
-    created_second = task_service.create_task(second)
-    import asyncio
-    created_first = asyncio.run(created_first)
-    created_second = asyncio.run(created_second)
-    asyncio.run(task_service.update_task_status(created_second.id, True))
 
     records = [
         {
@@ -90,6 +65,28 @@ def test_dashboard_summary_aggregates_tasks_and_results(tmp_path, monkeypatch):
         },
     ]
     _write_jsonl(jsonl_dir / "apple_watch_full_data.jsonl", records)
+
+    first = TaskCreate(
+      task_name="Apple Watch 任务",
+      keyword="apple watch",
+      description="只关注价格合适且成色好的 Apple Watch。",
+      max_pages=3,
+      personal_only=True,
+    )
+    second = TaskCreate(
+      task_name="iPad 任务",
+      keyword="ipad pro",
+      description="关注 2024 款 iPad Pro。",
+      max_pages=2,
+      personal_only=True,
+    )
+
+    created_first = task_service.create_task(first)
+    created_second = task_service.create_task(second)
+    import asyncio
+    created_first = asyncio.run(created_first)
+    created_second = asyncio.run(created_second)
+    asyncio.run(task_service.update_task_status(created_second.id, True))
 
     response = client.get("/api/dashboard/summary")
     assert response.status_code == 200

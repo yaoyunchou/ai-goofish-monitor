@@ -10,11 +10,7 @@ from urllib.parse import urlparse
 
 from src.infrastructure.config.env_manager import env_manager
 from src.infrastructure.config.settings import AISettings, scraper_settings
-from src.infrastructure.persistence.database_config import (
-    DRIVER_POSTGRES,
-    DRIVER_SQLITE,
-    get_sqlite_database_path,
-)
+from src.infrastructure.persistence.database_config import DRIVER_POSTGRES
 
 
 _RUNTIME_KEYS = (
@@ -23,9 +19,7 @@ _RUNTIME_KEYS = (
     "CURSOR_MODEL_NAME",
     "CURSOR_RUNTIME",
     "OPENAI_API_KEY",
-    "DATABASE_DRIVER",
     "DATABASE_URL",
-    "APP_DATABASE_FILE",
     "SERVER_PORT",
 )
 
@@ -43,10 +37,7 @@ def _resolved_value(key: str, default: str | None = None) -> str | None:
 
 
 def _effective_database_driver() -> str:
-    raw = (_resolved_value("DATABASE_DRIVER", DRIVER_SQLITE) or DRIVER_SQLITE).lower()
-    if raw in {DRIVER_POSTGRES, "postgresql", "supabase"}:
-        return DRIVER_POSTGRES
-    return DRIVER_SQLITE
+    return DRIVER_POSTGRES
 
 
 def _mask_database_url(url: str | None) -> dict[str, Any]:
@@ -71,7 +62,7 @@ def build_runtime_config_summary() -> dict[str, Any]:
     for key in _RUNTIME_KEYS:
         secret = key.endswith("_KEY") or key.endswith("_TOKEN") or key == "DATABASE_URL"
         source = _config_source(key)
-        entry: dict[str, Any] = {"source": source, "set": source != "unset"}
+        entry: dict[str, dict[str, Any] | str | bool] = {"source": source, "set": source != "unset"}
         if not secret and source != "unset":
             entry["value"] = _resolved_value(key)
         variables[key] = entry
@@ -83,7 +74,7 @@ def build_runtime_config_summary() -> dict[str, Any]:
         "server_port": _resolved_value("SERVER_PORT", "8000"),
         "database_driver": driver,
         "database_url": _mask_database_url(database_url),
-        "sqlite_path": get_sqlite_database_path() if driver == DRIVER_SQLITE else None,
+        "sqlite_path": None,
         "ai_provider": ai.normalized_provider(),
         "cursor_runtime_effective": ai.effective_cursor_runtime(),
         "ai_configured": ai.is_configured(),

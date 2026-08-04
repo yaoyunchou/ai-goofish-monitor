@@ -13,7 +13,7 @@ def _write_jsonl(path, records):
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
-def test_results_filter_and_sort_for_keyword_recommendations(tmp_path, monkeypatch):
+def test_results_filter_and_sort_for_keyword_recommendations(tmp_path, monkeypatch, clean_db):
     monkeypatch.chdir(tmp_path)
     jsonl_dir = tmp_path / "jsonl"
     jsonl_dir.mkdir(parents=True, exist_ok=True)
@@ -82,7 +82,7 @@ def test_results_filter_and_sort_for_keyword_recommendations(tmp_path, monkeypat
     assert resp.status_code == 400
 
 
-def test_results_insights_and_export_csv(tmp_path, monkeypatch):
+def test_results_insights_and_export_csv(tmp_path, monkeypatch, clean_db):
     monkeypatch.chdir(tmp_path)
     jsonl_dir = tmp_path / "jsonl"
     jsonl_dir.mkdir(parents=True, exist_ok=True)
@@ -198,7 +198,7 @@ def test_results_insights_and_export_csv(tmp_path, monkeypatch):
     assert "Demo One" in text
 
 
-def test_results_export_csv_supports_unicode_filename(tmp_path, monkeypatch):
+def test_results_export_csv_supports_unicode_filename(tmp_path, monkeypatch, clean_db):
     monkeypatch.chdir(tmp_path)
     jsonl_dir = tmp_path / "jsonl"
     jsonl_dir.mkdir(parents=True, exist_ok=True)
@@ -238,7 +238,7 @@ def test_results_export_csv_supports_unicode_filename(tmp_path, monkeypatch):
     assert "filename*=UTF-8''%E6%BC%94%E7%A4%BA_full_data.csv" in disposition
 
 
-def test_results_blacklist_rules_hide_items_from_view_and_insights(tmp_path, monkeypatch):
+def test_results_blacklist_rules_hide_items_from_view_and_insights(tmp_path, monkeypatch, clean_db):
     monkeypatch.chdir(tmp_path)
     jsonl_dir = tmp_path / "jsonl"
     jsonl_dir.mkdir(parents=True, exist_ok=True)

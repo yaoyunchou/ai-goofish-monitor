@@ -120,11 +120,11 @@ def get_link_unique_key(link: str) -> str:
 
 
 async def save_to_jsonl(data_record: dict, keyword: str):
-    """兼容旧调用名，实际将结果写入 SQLite。"""
+    """兼容旧调用名，实际将结果写入数据库。"""
     try:
         return await save_result_record(data_record, keyword)
     except Exception as e:
-        print(f"写入 SQLite 结果记录出错: {e}")
+        print(f"写入数据库结果记录出错: {e}")
         return False
 
 

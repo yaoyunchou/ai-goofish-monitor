@@ -9,7 +9,7 @@ A Playwright and AI-powered multi-task real-time monitoring tool for Xianyu (闲
 - **Web Visual Management**: Task management, account management, AI criteria editing, run logs, results browsing
 - **AI-Driven**: Natural language task creation, multimodal model for in-depth product analysis
 - **Multi-Task Concurrency**: Independent configuration for keywords, prices, filters, and AI prompts
-- **SQLite as Primary Storage**: Tasks, results, and price history are persisted in one embedded database instead of repeatedly scanning `jsonl`
+- **Postgres as Primary Storage**: Tasks, results, and price history are persisted in Postgres (Supabase recommended) instead of repeatedly scanning `jsonl`
 - **Advanced Filtering**: Free shipping, new listing time range, province/city/district filtering
 - **Instant Notifications**: Supports ntfy.sh, WeChat Work (企业微信), Bark, Telegram, Webhook
 - **Scheduled Tasks**: Cron expression configuration for periodic tasks
@@ -86,23 +86,22 @@ docker compose down
 - The published Docker image already includes Chromium, so no extra browser install is required on the host.
 - Update image: `docker compose pull && docker compose up -d`
 - If you change `SERVER_PORT` in `.env`, update the `ports` mapping in `docker-compose.yaml` as well.
-- `docker-compose.yaml` now mounts the primary SQLite database directory as `./data:/app/data`, with the default database file at `data/app.sqlite3`
+- `docker-compose.yaml` no longer mounts a local database directory; tasks, results, and price history are stored in Postgres (see `DATABASE_URL` in `.env`)
 - These paths are persisted by default:
-  - `data/` for the SQLite primary store (tasks, results, price history)
   - `state/` for login-state cookie files
   - `prompts/` for task prompt files
   - `logs/` for runtime logs
   - `images/` for downloaded product images and per-task temporary image folders
-  - `config.json`, `jsonl/`, and `price_history/` as legacy sources for the first SQLite migration
+  - `config.json`, `jsonl/`, and `price_history/` as legacy sources for the first-run import (can be removed after import)
 
 ### Storage and Migration
 
-- SQLite is now the online primary storage, with the default path `data/app.sqlite3`
-- You can override the database path with `APP_DATABASE_FILE`; Docker sets it to `/app/data/app.sqlite3`
-- On startup, the app initializes the schema and tries to import existing data once from legacy `config.json`, `jsonl/`, and `price_history/`
-- `state/`, `prompts/`, `logs/`, and `images/` remain filesystem-based and are not stored in SQLite
+- Primary storage is Postgres (Supabase recommended); configure the connection string via the `DATABASE_URL` environment variable
+- On first deploy, run `supabase/migrations/20260803120000_initial_goofish_schema.sql` against the target database (via `supabase db push` or SQL Editor)
+- On startup, the app tries to import existing data once from legacy `config.json`, `jsonl/`, and `price_history/` (only when the corresponding tables are empty)
+- `state/`, `prompts/`, `logs/`, and `images/` remain filesystem-based and are not stored in the database
 - Product images are temporarily downloaded to `images/task_images_<task_name>/` and are normally cleaned up when the task finishes
-- After the first upgrade and after verifying the database contents in `data/app.sqlite3`, you can decide whether to keep the legacy `config.json`, `jsonl/`, and `price_history/` mounts
+- Run `python -m scripts.verify_database` to self-check connectivity and row counts
 
 ## User Guide
 
@@ -122,7 +121,7 @@ docker compose down
 
 ### Results and Logs
 
-- The results page and export endpoints now query SQLite instead of directly scanning `jsonl` files.
+- The results page and export endpoints now query Postgres instead of directly scanning `jsonl` files.
 - The logs page is the first place to inspect login-state expiry, anti-bot issues, or AI call failures.
 
 ### System Settings
@@ -147,9 +146,9 @@ npm install
 npm run dev
 ```
 
-- FastAPI initializes SQLite on startup and performs the one-time legacy import from `config.json/jsonl/price_history` when needed
-- `spider_v2.py` now loads tasks from SQLite by default; JSON config is only used when `--config <path>` is passed explicitly
-- The default local database path is `data/app.sqlite3`
+- FastAPI connects to Postgres on startup (schema must be applied first) and performs the one-time legacy import from `config.json/jsonl/price_history` when needed
+- `spider_v2.py` now loads tasks from Postgres by default; JSON config is only used when `--config <path>` is passed explicitly
+- The database connection string is configured via the `DATABASE_URL` environment variable
 - The Vite dev server proxies `/api`, `/auth`, and `/ws` to `http://127.0.0.1:8000`.
 - `npm run build` writes `web-ui/dist/`, and `start.sh` copies it to the repository root `dist/`.
 - FastAPI serves `dist/index.html` and `dist/assets/` from the repository root.
@@ -238,7 +237,7 @@ graph TD
     F --> G[Call AI for Analysis];
     G --> H{AI Recommended?};
     H -- Yes --> I[Send Notification];
-    H -- No --> J[Save Record to SQLite];
+    H -- No --> J[Save Record to database];
     I --> J;
     D -- No --> K[Next Page/Wait];
     K --> C;

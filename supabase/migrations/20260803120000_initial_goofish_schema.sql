@@ -1,4 +1,4 @@
--- ai-goofish-monitor 业务表（与 SQLite schema 对齐）
+-- ai-goofish-monitor 业务表初始 schema（Postgres）
 -- 在 Supabase SQL Editor 执行，或通过 supabase db push / migration 应用
 -- Project: wkhatdhgohkpsqkytotz
 

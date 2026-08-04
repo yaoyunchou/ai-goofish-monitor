@@ -4,11 +4,11 @@
 API URL：`https://wkhatdhgohkpsqkytotz.supabase.co`  
 Dashboard：[Project Settings](https://supabase.com/dashboard/project/wkhatdhgohkpsqkytotz/settings/general)
 
-> **重要**：当前应用代码仍默认 **SQLite**（`data/app.sqlite3`）。本文说明如何在 Supabase 建库、如何配置环境变量，以及切换到 Postgres 前需要完成的代码改造（与 [database-mysql-migration-plan.md](./database-mysql-migration-plan.md) 同路线，引擎改为 Postgres）。
+> 应用已全面切换到 **Postgres**，SQLite 已移除。本文说明如何在 Supabase 建库、如何配置连接串、以及连通性自检。
 
 ---
 
-## 1. 在 Supabase 上建表（你现在就能做）
+## 1. 在 Supabase 上建表（首次部署必做）
 
 任选其一：
 
@@ -28,7 +28,7 @@ supabase link --project-ref wkhatdhgohkpsqkytotz
 supabase db push
 ```
 
-迁移前请用 `supabase migration new <name>` 创建新文件（勿手写随机文件名），见官方 CLI 文档。
+后续迁移请用 `supabase migration new <name>` 创建新文件（勿手写随机文件名），见官方 CLI 文档。
 
 ---
 
@@ -49,10 +49,7 @@ supabase db push
 ### `.env` 配置模板（勿提交密码）
 
 ```env
-# 目标：sqlite | postgres（postgres 实现待代码合并后生效）
-DATABASE_DRIVER=sqlite
-
-# --- Supabase Postgres（DATABASE_DRIVER=postgres 时使用）---
+# --- Supabase Postgres（必填）---
 # SQLAlchemy + asyncpg 推荐写法（密码含特殊字符请 URL 编码）
 DATABASE_URL=postgresql+asyncpg://postgres:[YOUR-DB-PASSWORD]@db.wkhatdhgohkpsqkytotz.supabase.co:5432/postgres
 
@@ -64,12 +61,7 @@ DATABASE_URL=postgresql+asyncpg://postgres:[YOUR-DB-PASSWORD]@db.wkhatdhgohkpsqk
 # SUPABASE_SERVICE_ROLE_KEY=   # 仅后端服务器，禁止写入前端或提交 Git
 ```
 
-本地仍用 SQLite 时保留：
-
-```env
-DATABASE_DRIVER=sqlite
-APP_DATABASE_FILE=data/app.sqlite3
-```
+> 直连在某些网络环境仅解析 IPv6，若不可达请改用 Session pooler 连接串，或在 Supabase 开启 IPv4 附加项。
 
 ---
 
@@ -77,7 +69,7 @@ APP_DATABASE_FILE=data/app.sqlite3
 
 | 密钥 | 用途 | 本项目 |
 |------|------|--------|
-| **Database 连接串 + DB 密码** | `psycopg` / `asyncpg` 直连 SQL | **承接 tasks / results 等主数据（目标方案）** |
+| **Database 连接串 + DB 密码** | `psycopg` / `asyncpg` 直连 SQL | **承接 tasks / results 等主数据** |
 | `anon` / publishable | 浏览器端 Supabase Client | **不必**用于闲鱼监控业务表 |
 | `service_role` | 服务端绕过 RLS 的 REST | 仅在你主动用 Supabase API 时需要；**勿暴露给 Vue 前端** |
 
@@ -94,23 +86,17 @@ APP_DATABASE_FILE=data/app.sqlite3
 
 ---
 
-## 5. 应用侧还要改什么（才能真用上 Supabase）
+## 5. 历史数据导入（可选）
 
-代码现状：全部走 `sqlite_connection` + `SqliteTaskRepository`。
+应用首次启动时会自动从遗留的 `config.json` / `jsonl/` / `price_history/` 一次性导入历史数据（仅当对应表为空时）。导入进度记录在 `app_metadata` 表的 `bootstrap:*` 键中。
 
-切换步骤（与 MySQL 计划相同，方言改为 Postgres）：
-
-1. `DATABASE_DRIVER=postgres` + `DATABASE_URL`
-2. 实现 Postgres 仓储（或 SQLAlchemy + Alembic）
-3. `INSERT OR IGNORE` → `ON CONFLICT DO NOTHING` 等
-4. 可选 CLI：`sqlite → postgres` 数据迁移（保留 `result_items.id` 以兼容 `collected_items` 外键）
-5. 集成测试在 Supabase **分支库** 或本地 `supabase start` 上跑
-
-- 代码已支持 `DATABASE_DRIVER=postgres` + `DATABASE_URL`（`psycopg` 直连）；切换后重启 API/爬虫
+如需从旧的本地 `data/app.sqlite3` 搬迁历史数据到 Postgres，目前需手动导出导入（保留 `result_items.id` 以兼容 `collected_items` 外键）。
 
 ---
 
 ## 6. 连通性自检（建表后）
+
+仓库自带自检脚本：
 
 ```bash
 pip install -r requirements.txt
@@ -128,10 +114,9 @@ python3 -m scripts.verify_database
 
 因此：本机改好 `.env` 后，在 Cloud Agent 若仍连错库，请检查 Secrets 是否仍注入旧的 `DATABASE_URL`；或在 `.env` 中保留正确值（会覆盖 Secret）。Web 保存设置会写回 `.env`。
 
----
+或在已安装 `psql` 的机器上（密码勿泄露）：
 
 ```bash
-# 使用控制台复制的 URI，或：
 psql "postgresql://postgres:[PASSWORD]@db.wkhatdhgohkpsqkytotz.supabase.co:5432/postgres" -c "SELECT COUNT(*) FROM tasks;"
 ```
 
@@ -155,10 +140,9 @@ WHERE table_schema = 'public' AND table_name IN ('tasks', 'result_items', 'colle
 
 ## 8. 检查清单
 
-- [ ] SQL Editor 已执行 `20260803120000_initial_goofish_schema.sql`
+- [x] SQL Editor 已执行 `20260803120000_initial_goofish_schema.sql`
+- [x] 代码已切换为 Postgres-only（`psycopg` 直连）
 - [ ] `.env` 已配置 `DATABASE_URL`（仅本机，不提交 Git）
 - [ ] 已确认 IPv4：Supabase 直连需网络能访问 `db.*.supabase.co`（企业网需放行或使用 pooler）
-- [ ] 代码合并 Postgres 驱动后，将 `DATABASE_DRIVER=postgres` 并重启 API / 爬虫
-- [ ] 从 SQLite 迁移数据（若有历史 `app.sqlite3`）
-
-如需下一步在仓库内实现 **Postgres 仓储 + 开关**，可指定优先模块（仅 tasks / 含 result_items）。
+- [ ] 重启 API / 爬虫使新配置生效
+- [ ] （可选）从历史 `app.sqlite3` 手动迁移数据

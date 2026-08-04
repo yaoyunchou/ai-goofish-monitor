@@ -56,23 +56,23 @@ docker compose up -d
 - 官方镜像地址：`ghcr.io/usagi-org/ai-goofish:latest`
 - 更新镜像：`docker compose pull && docker compose up -d`
 - 如果你修改了 `.env` 中的 `SERVER_PORT`，请同步更新 `docker-compose.yaml` 里的端口映射。
-- `docker-compose.yaml` 默认会把 SQLite 主库挂载到 `./data:/app/data`，数据库文件默认为 `data/app.sqlite3`
+- `docker-compose.yaml` 不再挂载本地数据库目录；任务、结果、价格历史统一存入 Postgres（见 `.env` 的 `DATABASE_URL`）
 - 目前默认持久化这些目录：
-    - `data/`  SQLite 主存储（任务、结果、价格历史）
+    - `data/` 目录已废弃（原本地数据库存储已移除，不再使用）
     - `state/`  登录状态 cookie 文件
     - `prompts/`  任务提示词
     - `logs/`  运行日志
     - `images/`  商品图片与任务临时图片目录
-    - `config.json`、`jsonl/`、`price_history/`  首次升级到 SQLite 时用于兼容导入的旧数据源
+    - `config.json`、`jsonl/`、`price_history/`  首次启动时用于兼容导入的旧数据源（导入完成后可移除）
 
 ### 数据存储与迁移
 
-- 当前在线主存储为 SQLite，默认路径 `data/app.sqlite3`
-- 可通过环境变量 `APP_DATABASE_FILE` 自定义数据库路径；Docker 默认设置为 `/app/data/app.sqlite3`
-- 应用启动时会自动建库建表，并尝试从旧的 `config.json`、`jsonl/`、`price_history/` 导入一次历史数据
-- `state/`、`prompts/`、`logs/`、`images/` 仍然是文件系统目录，不在 SQLite 中
+- 主存储为 Postgres（推荐 Supabase），通过环境变量 `DATABASE_URL` 配置连接串
+- 首次部署需先在目标库执行 `supabase/migrations/20260803120000_initial_goofish_schema.sql` 建表（可用 `supabase db push` 或 SQL Editor）
+- 应用启动时会尝试从旧的 `config.json`、`jsonl/`、`price_history/` 一次性导入历史数据（仅当对应表为空时）
+- `state/`、`prompts/`、`logs/`、`images/` 仍然是文件系统目录，不在数据库中
 - 商品图片会临时落到 `images/task_images_<task_name>/`，任务结束后默认会清理
-- 首次升级完成并确认 `data/app.sqlite3` 中数据正确后，可视部署方式决定是否继续保留旧的 `config.json`、`jsonl/`、`price_history/` 挂载
+- 可用 `python -m scripts.verify_database` 自检连通性与各表行数
 
 ### 最少配置
 
@@ -125,7 +125,7 @@ docker compose up -d
 
 ### 结果查看与运行日志
 
-- 结果页和导出功能现在从 SQLite 查询，不再直接扫描 `jsonl` 文件。
+- 结果页和导出功能现在从 Postgres 查询，不再直接扫描 `jsonl` 文件。
 - 日志页按任务展示运行过程，便于排查登录态失效、风控和 AI 调用问题。
 
 ### 系统设置
@@ -174,9 +174,9 @@ npm install
 npm run dev
 ```
 
-- FastAPI 启动时会自动初始化 SQLite，并在首次启动时尝试导入旧的 `config.json/jsonl/price_history`
-- `spider_v2.py` 默认从 SQLite 读取任务；只有显式传入 `--config <path>` 时才会走 JSON 配置兼容模式
-- 默认数据库路径为 `data/app.sqlite3`
+- FastAPI 启动时会连接 Postgres（需已执行建表 migration），并在首次启动时尝试导入旧的 `config.json/jsonl/price_history`
+- `spider_v2.py` 默认从 Postgres 读取任务；只有显式传入 `--config <path>` 时才会走 JSON 配置兼容模式
+- 数据库连接串通过环境变量 `DATABASE_URL` 配置
 - Vite 开发服务器会将 `/api`、`/auth`、`/ws` 代理到 `http://127.0.0.1:8000`。
 - `npm run build` 先生成 `web-ui/dist/`，`start.sh` 再复制到仓库根目录 `dist/`。
 - FastAPI 负责提供根目录 `dist/index.html` 和 `dist/assets/`。
@@ -265,7 +265,7 @@ graph TD
     F --> G[调用AI进行分析];
     G --> H{AI是否推荐?};
     H -- 是 --> I[发送通知];
-    H -- 否 --> J[保存记录到 SQLite];
+    H -- 否 --> J[保存记录到数据库];
     I --> J;
     D -- 否 --> K[翻页/等待];
     K --> C;
