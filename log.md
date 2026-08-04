@@ -9,6 +9,7 @@
 - `EnvManager.config_source()` 供运行时诊断
 - 测试使用 `data/.pytest-env`，避免仓库 `.env` 干扰
 - 保留 `.env.20260803` 作为测试环境配置备份（后续由你自行改密码/连接串）
+- 新增 `.env.20260804`：自当前 `/workspace/.env` 复制的配置快照
 
 ## 2026-08-03
 
