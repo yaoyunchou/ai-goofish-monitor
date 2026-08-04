@@ -2,6 +2,12 @@
 
 ## 2026-08-04
 
+### chore(ops): 刷新闲鱼 Cookie 登录态
+
+- 更新 `state/xy699909515578.json`（多域名 `.goofish.com` / `.taobao.com` 展开，便于 Playwright 携带）
+- 任务「机乐堂30w多口充电头」重新绑定 `account_strategy=fixed`
+- 验证：搜索页可解析商品列表；此前 02:00 失败为旧 Cookie 跳转登录页
+
 ### chore(release): 合并 Postgres-only 与配置修复到 `master`
 
 - 将 `cursor/remove-sqlite-postgres-only-dc12` fast-forward 合入 `origin/master`（含 #6 / #7 对应改动）
