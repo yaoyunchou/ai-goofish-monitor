@@ -8,6 +8,7 @@
 - `verify_database` 输出配置来源；密码失败与 IPv6 分开展示提示
 - `EnvManager.config_source()` 供运行时诊断
 - 测试使用 `data/.pytest-env`，避免仓库 `.env` 干扰
+- 保留 `.env.20260803` 作为测试环境配置备份（后续由你自行改密码/连接串）
 
 ## 2026-08-03
 
