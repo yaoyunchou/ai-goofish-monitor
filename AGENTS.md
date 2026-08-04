@@ -4,7 +4,7 @@
 - 后端位于 `src/`，入口 `src/app.py`，API 路由在 `src/api/routes/`，服务层在 `src/services/`，领域模型在 `src/domain/`，基础设施在 `src/infrastructure/`。
 - 前端在 `web-ui/`（Vue 3 + Vite），视图放于 `web-ui/src/views/`，组件在 `web-ui/src/components/`，构建产物会复制到根目录 `dist/`。
 - 测试位于 `tests/`，命名遵循 `test_*.py` 或 `tests/*/test_*.py`。
-- 运行数据与资源：`prompts/`、`jsonl/`、`logs/`、`images/`、`static/`、`state/`，配置文件 `config.json` 与 `.env` 位于仓库根目录。
+- 运行数据与资源：`prompts/`、`jsonl/`、`logs/`、`images/`、`static/`、`state/`，配置文件 `config.json` 与 `.env`（含 `DATABASE_URL`）位于仓库根目录。
 
 ## 构建、测试与本地开发
 - 后端开发：`python -m src.app` 或 `uvicorn src.app:app --host 0.0.0.0 --port 8000 --reload`。
@@ -20,7 +20,7 @@
 
 ## 架构与运行时
 - 后端使用 FastAPI 提供 API 与静态资源，爬虫与 AI 推理在独立任务进程中协作，前后端通过 HTTP/Web UI 交互。
-- 任务运行会在 `jsonl/` 写入结果、在 `logs/` 留存运行日志、在 `images/` 下载图片，前端监控页面依赖这些数据。
+- 主数据在 **PostgreSQL**（`.env` 的 `DATABASE_URL`）；任务结果等写入数据库，`jsonl/` 仍可作为爬虫输出与 bootstrap 来源。
 - 默认监听 8000 端口，前端构建后静态文件可由后端或 Docker 镜像直接提供。
 
 ## 测试指南
@@ -34,6 +34,6 @@
 - PR 需说明变更范围与影响模块；UI 变更在 `web-ui/` 提供截图；关联相关 Issue；提及配置或迁移步骤。
 
 ## 安全与配置提示
-- 复制 `.env.example` 为 `.env`，设置 `AI_PROVIDER`（`openai` 或 `cursor`）及对应 API Key；OpenAI 兼容模式需 `OPENAI_*`，Cursor 模式需 `CURSOR_API_KEY` 等（见 `docs/ai-provider.md`）。
+- 复制 `.env.example` 为 `.env`，配置 **`DATABASE_URL`**（PostgreSQL）及 `AI_PROVIDER`（`openai` 或 `cursor`）与对应 API Key（见 `docs/ai-provider.md`、`docs/database-supabase-integration.md`）。
 - 不要提交真实凭据或 cookies（如 `state.json`）；Playwright 需本地浏览器，Docker 镜像已预装 Chromium。
 - Web 认证默认 `admin/admin123`，生产环境务必修改，推荐启用 HTTPS 并限制访问来源。

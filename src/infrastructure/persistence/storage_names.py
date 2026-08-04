@@ -1,10 +1,11 @@
 """
-SQLite 持久化相关的统一命名规则。
+结果文件命名等与存储相关的常量（主库为 PostgreSQL）。
 """
 from __future__ import annotations
 
+# 仅 scripts/migrate_sqlite_to_postgres 读取旧文件时的默认路径
+LEGACY_SQLITE_MIGRATION_SOURCE = "data/app.sqlite3"
 
-DEFAULT_DATABASE_PATH = "data/app.sqlite3"
 RESULT_FILE_SUFFIX = "_full_data.jsonl"
 
 

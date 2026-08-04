@@ -86,23 +86,19 @@ docker compose down
 - The published Docker image already includes Chromium, so no extra browser install is required on the host.
 - Update image: `docker compose pull && docker compose up -d`
 - If you change `SERVER_PORT` in `.env`, update the `ports` mapping in `docker-compose.yaml` as well.
-- `docker-compose.yaml` now mounts the primary SQLite database directory as `./data:/app/data`, with the default database file at `data/app.sqlite3`
+- Set `DATABASE_URL` in `.env` for PostgreSQL (e.g. Supabase); Docker no longer mounts a SQLite file.
 - These paths are persisted by default:
-  - `data/` for the SQLite primary store (tasks, results, price history)
   - `state/` for login-state cookie files
   - `prompts/` for task prompt files
   - `logs/` for runtime logs
   - `images/` for downloaded product images and per-task temporary image folders
-  - `config.json`, `jsonl/`, and `price_history/` as legacy sources for the first SQLite migration
+  - `config.json`, `jsonl/`, and `price_history/` as legacy sources for one-time import when DB tables are empty
 
-### Storage and Migration
+### Storage
 
-- SQLite is now the online primary storage, with the default path `data/app.sqlite3`
-- You can override the database path with `APP_DATABASE_FILE`; Docker sets it to `/app/data/app.sqlite3`
-- On startup, the app initializes the schema and tries to import existing data once from legacy `config.json`, `jsonl/`, and `price_history/`
-- `state/`, `prompts/`, `logs/`, and `images/` remain filesystem-based and are not stored in SQLite
-- Product images are temporarily downloaded to `images/task_images_<task_name>/` and are normally cleaned up when the task finishes
-- After the first upgrade and after verifying the database contents in `data/app.sqlite3`, you can decide whether to keep the legacy `config.json`, `jsonl/`, and `price_history/` mounts
+- Primary data is in **PostgreSQL** (`DATABASE_URL`)
+- On startup, empty tables may be bootstrapped once from `config.json`, `jsonl/`, and `price_history/`
+- `state/`, `prompts/`, `logs/`, and `images/` remain on the filesystem
 
 ## User Guide
 
@@ -122,7 +118,7 @@ docker compose down
 
 ### Results and Logs
 
-- The results page and export endpoints now query SQLite instead of directly scanning `jsonl` files.
+- The results page and export endpoints query **PostgreSQL**, not raw `jsonl` files.
 - The logs page is the first place to inspect login-state expiry, anti-bot issues, or AI call failures.
 
 ### System Settings
@@ -147,9 +143,8 @@ npm install
 npm run dev
 ```
 
-- FastAPI initializes SQLite on startup and performs the one-time legacy import from `config.json/jsonl/price_history` when needed
-- `spider_v2.py` now loads tasks from SQLite by default; JSON config is only used when `--config <path>` is passed explicitly
-- The default local database path is `data/app.sqlite3`
+- FastAPI connects to PostgreSQL on startup; legacy import from `config.json` / `jsonl` / `price_history` when tables are empty
+- `spider_v2.py` loads tasks from the database; pass `--config <path>` only for JSON compatibility
 - The Vite dev server proxies `/api`, `/auth`, and `/ws` to `http://127.0.0.1:8000`.
 - `npm run build` writes `web-ui/dist/`, and `start.sh` copies it to the repository root `dist/`.
 - FastAPI serves `dist/index.html` and `dist/assets/` from the repository root.

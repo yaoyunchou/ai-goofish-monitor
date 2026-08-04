@@ -20,7 +20,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from src.infrastructure.persistence.database_config import get_postgres_dsn  # noqa: E402
-from src.infrastructure.persistence.storage_names import DEFAULT_DATABASE_PATH  # noqa: E402
+from src.infrastructure.persistence.storage_names import LEGACY_SQLITE_MIGRATION_SOURCE  # noqa: E402
 
 TABLE_ORDER = (
     "app_metadata",
@@ -226,7 +226,7 @@ def migrate(source: Path, *, dry_run: bool, tables: list[str] | None) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="SQLite → PostgreSQL 数据迁移")
-    parser.add_argument("--source", type=Path, default=Path(DEFAULT_DATABASE_PATH))
+    parser.add_argument("--source", type=Path, default=Path(LEGACY_SQLITE_MIGRATION_SOURCE))
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--tables", type=str, default="", help="逗号分隔，默认全部")
     args = parser.parse_args()

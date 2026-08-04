@@ -1,5 +1,11 @@
 # Web UI 变更日志
 
+## 2026-08-04
+
+### chore(settings): 系统状态仅展示 PostgreSQL
+
+- 移除 `sqlite_path` 展示；数据库仅显示 `database_url` 主机/库名
+
 ## 2026-08-03
 
 ### feat(settings): 系统状态页展示运行环境摘要

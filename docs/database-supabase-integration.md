@@ -1,177 +1,84 @@
 # Supabase（PostgreSQL）接入指南
 
 项目：**wkhatdhgohkpsqkytotz**  
-API URL：`https://wkhatdhgohkpsqkytotz.supabase.co`  
 Dashboard：[Project Settings](https://supabase.com/dashboard/project/wkhatdhgohkpsqkytotz/settings/general)
 
-> **重要**：当前应用代码仍默认 **SQLite**（`data/app.sqlite3`）。本文说明如何在 Supabase 建库、如何配置环境变量，以及切换到 Postgres 前需要完成的代码改造（与 [database-mysql-migration-plan.md](./database-mysql-migration-plan.md) 同路线，引擎改为 Postgres）。
+应用**仅使用 PostgreSQL**：在 `.env` 配置 `DATABASE_URL`（推荐 **Session pooler**）。架构：**Vue → FastAPI → PostgreSQL**（`psycopg`）。
 
 ---
 
-## 1. 在 Supabase 上建表（你现在就能做）
+## 1. 建表
 
-任选其一：
+在 [SQL Editor](https://supabase.com/dashboard/project/wkhatdhgohkpsqkytotz/sql/new) 执行：
 
-### 方式 A：SQL Editor（最快）
+`supabase/migrations/20260803120000_initial_goofish_schema.sql`
 
-1. 打开 [SQL Editor](https://supabase.com/dashboard/project/wkhatdhgohkpsqkytotz/sql/new)
-2. 粘贴并执行仓库内：  
-   `supabase/migrations/20260803120000_initial_goofish_schema.sql`
-3. 在 **Table Editor** 中确认出现：`tasks`、`result_items`、`price_snapshots`、`collected_items` 等
+或使用 Supabase CLI：`supabase link` + `supabase db push`。
 
-### 方式 B：Supabase CLI（推荐长期维护）
+---
+
+## 2. 连接串
+
+Dashboard → **Connect** → **Session pooler** → URI，填入 **Database password** 后复制。
+
+| 模式 | 说明 |
+|------|------|
+| Session pooler | 多进程 / Cloud 推荐，`postgres.<project-ref>@...pooler...:5432` |
+| Direct | 仅当网络可达 `db.*.supabase.co`（部分环境仅 IPv6） |
+
+### `.env`（勿提交密码）
+
+```env
+DATABASE_URL=postgresql+asyncpg://postgres.wkhatdhgohkpsqkytotz:[PASSWORD]@aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres
+```
+
+密码是 **Database password**，不是 `anon` / `service_role` JWT。
+
+### 配置优先级
+
+1. 仓库 `.env`（`env_manager` 优先）
+2. 进程环境变量（如 Cursor Secrets，仅当 `.env` 无该键）
+
+---
+
+## 3. 自检与启动
 
 ```bash
-# 安装 CLI 后
-supabase login
-supabase link --project-ref wkhatdhgohkpsqkytotz
-supabase db push
+pip install -r requirements.txt
+python3 -m scripts.verify_database   # 应显示 连接: OK
+python3 -m src.app
 ```
 
-迁移前请用 `supabase migration new <name>` 创建新文件（勿手写随机文件名），见官方 CLI 文档。
+表为空时，启动会尝试从 `config.json` / `jsonl/` / `price_history/` **导入一次**（bootstrap）。
 
 ---
 
-## 2. 连接串怎么选（给 Python 后端用）
+## 4. 可选：从旧 SQLite 文件导入历史数据
 
-在 Dashboard → **Project Settings → Database → Connection string**：
-
-| 模式 | 适用场景 | 端口 |
-|------|----------|------|
-| **Direct connection** | 迁移 DDL、长连接、爬虫 + API 同机 | `5432`，主机 `db.wkhatdhgohkpsqkytotz.supabase.co` |
-| **Session pooler** | 多进程/连接较多时的池化 | 通常 `5432`，用户 `postgres.wkhatdhgohkpsqkytotz` |
-| **Transaction pooler** | Serverless 短请求 | `6543`（本项目 **不推荐** 作为首选） |
-
-**本仓库（FastAPI + 爬虫子进程）建议**：优先 **Direct** 或 **Session pooler**。
-
-密码使用 **Database password**（创建项目时设置，可在 Database Settings 里重置），**不是** `anon` / `service_role` JWT。
-
-### `.env` 配置模板（勿提交密码）
-
-```env
-# 目标：sqlite | postgres（postgres 实现待代码合并后生效）
-DATABASE_DRIVER=sqlite
-
-# --- Supabase Postgres（DATABASE_DRIVER=postgres 时使用）---
-# SQLAlchemy + asyncpg 推荐写法（密码含特殊字符请 URL 编码）
-DATABASE_URL=postgresql+asyncpg://postgres:[YOUR-DB-PASSWORD]@db.wkhatdhgohkpsqkytotz.supabase.co:5432/postgres
-
-# 若使用 Session pooler，将主机/用户换为控制台给出的 Pooler 串，例如：
-# DATABASE_URL=postgresql+asyncpg://postgres.wkhatdhgohkpsqkytotz:[PASSWORD]@aws-0-[region].pooler.supabase.com:5432/postgres
-
-# 仅当你通过 Supabase JS/REST 调 Storage/Auth 时才需要（本项目的 Web 仍走 FastAPI 时可不配）
-# SUPABASE_URL=https://wkhatdhgohkpsqkytotz.supabase.co
-# SUPABASE_SERVICE_ROLE_KEY=   # 仅后端服务器，禁止写入前端或提交 Git
-```
-
-本地仍用 SQLite 时保留：
-
-```env
-DATABASE_DRIVER=sqlite
-APP_DATABASE_FILE=data/app.sqlite3
-```
-
----
-
-## 3. 和 Supabase「API Keys」的关系
-
-| 密钥 | 用途 | 本项目 |
-|------|------|--------|
-| **Database 连接串 + DB 密码** | `psycopg` / `asyncpg` 直连 SQL | **承接 tasks / results 等主数据（目标方案）** |
-| `anon` / publishable | 浏览器端 Supabase Client | **不必**用于闲鱼监控业务表 |
-| `service_role` | 服务端绕过 RLS 的 REST | 仅在你主动用 Supabase API 时需要；**勿暴露给 Vue 前端** |
-
-当前架构：**Vue → FastAPI → PostgreSQL**，不强制接入 Supabase Auth。
-
----
-
-## 4. RLS 说明（已写入初始 migration）
-
-业务表已 `ENABLE ROW LEVEL SECURITY`，且**未**对 `anon` / `authenticated` 添加开放策略 → 通过 Supabase Data API 默认无法读业务表。  
-后端使用 **Database 连接串**（`postgres` 数据库用户）读写不受 PostgREST 策略影响。
-
-若以后要开放移动端直连 Supabase，需单独设计 RLS，且**不要用 `user_metadata` 做授权**（见 Supabase 安全文档）。
-
----
-
-> **重要**：应用**仅使用 PostgreSQL**（`.env` 中 `DATABASE_URL`，推荐 Supabase Session pooler）。历史 `data/app.sqlite3` 请用迁移脚本导入。
-
----
-
-## 5. 从 SQLite 迁移数据（一次性）
-
-1. 确认 Supabase 已执行 `supabase/migrations/20260803120000_initial_goofish_schema.sql`
-2. `.env` 中配置好 `DATABASE_URL`
-3. 在本机执行（先 dry-run）：
+**不需要老数据可跳过。**
 
 ```bash
 python3 -m scripts.migrate_sqlite_to_postgres --source data/app.sqlite3 --dry-run
 python3 -m scripts.migrate_sqlite_to_postgres --source data/app.sqlite3
-python3 -m scripts.verify_database
-```
-
-4. 重启 API / 爬虫；Web 核对任务数、结果条数
-
-可选：`--tables tasks,result_items` 只迁部分表。
-
----
-
-## 5b. 应用架构（当前）
-
-- **Vue → FastAPI → PostgreSQL**（`psycopg`）
-- 启动时 `bootstrap_storage()` 仅在表为空时从 `config.json` / `jsonl/` 导入
-
----
-
-## 6. 连通性自检（建表后）
-
-```bash
-pip install -r requirements.txt
-python3 -m scripts.verify_database
-```
-
-脚本会检查核心表行数并对 `app_metadata` 做读写探针（不打印密码）。输出中会标注 `DATABASE_*` 来自 `env_file` 还是 `process_env`（如 Cursor Secrets）。
-
-### 配置优先级（与 Web「系统状态」一致）
-
-| 顺序 | 来源 | 说明 |
-|------|------|------|
-| 1 | 仓库根目录 **`.env`** | `env_manager` / 数据库连接 / `verify_database` 均**优先**读文件 |
-| 2 | **进程环境变量** | 仅当 `.env` 中**没有**该键时生效（如 Cursor Cloud **Secrets**） |
-
-因此：本机改好 `.env` 后，在 Cloud Agent 若仍连错库，请检查 Secrets 是否仍注入旧的 `DATABASE_URL`；或在 `.env` 中保留正确值（会覆盖 Secret）。Web 保存设置会写回 `.env`。
-
----
-
-```bash
-# 使用控制台复制的 URI，或：
-psql "postgresql://postgres:[PASSWORD]@db.wkhatdhgohkpsqkytotz.supabase.co:5432/postgres" -c "SELECT COUNT(*) FROM tasks;"
-```
-
-或在 SQL Editor：
-
-```sql
-SELECT table_name FROM information_schema.tables
-WHERE table_schema = 'public' AND table_name IN ('tasks', 'result_items', 'collected_items');
 ```
 
 ---
 
-## 7. 你需要在 Cursor 里做的（可选）
+## 5. 检查清单
 
-若希望 Agent 通过 MCP 直接查库、跑 advisors：
-
-1. 配置 [Supabase MCP](https://supabase.com/docs/guides/getting-started/mcp) 并完成 OAuth
-2. 关联 project `wkhatdhgohkpsqkytotz`
+- [x] 运行时仅 Postgres（无 `DATABASE_DRIVER` / `APP_DATABASE_FILE`）
+- [ ] SQL 已执行 `20260803120000_initial_goofish_schema.sql`
+- [ ] `.env` 已配置 `DATABASE_URL`
+- [ ] `python3 -m scripts.verify_database` 通过
+- [ ] （可选）旧 `app.sqlite3` 已迁移或丢弃
 
 ---
 
-## 8. 检查清单
+## 6. API Keys 说明
 
-- [ ] SQL Editor 已执行 `20260803120000_initial_goofish_schema.sql`
-- [ ] `.env` 已配置 `DATABASE_URL`（仅本机，不提交 Git）
-- [ ] 已确认 IPv4：Supabase 直连需网络能访问 `db.*.supabase.co`（企业网需放行或使用 pooler）
-- [ ] 代码合并 Postgres 驱动后，将 `DATABASE_DRIVER=postgres` 并重启 API / 爬虫
-- [ ] 从 SQLite 迁移数据（若有历史 `app.sqlite3`）
+| 密钥 | 本项目 |
+|------|--------|
+| Database 连接串 | **业务表读写（必配）** |
+| `anon` / `service_role` | 不必用于监控业务表 |
 
-如需下一步在仓库内实现 **Postgres 仓储 + 开关**，可指定优先模块（仅 tasks / 含 result_items）。
+业务表已启用 RLS 且无开放策略；后端用 Database 连接串不受 PostgREST 限制。

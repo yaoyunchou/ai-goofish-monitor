@@ -160,7 +160,6 @@ def build_server_env(workspace: Path, repo_root: Path, port: int) -> dict[str, s
     debug_limit = str(os.getenv("LIVE_TEST_DEBUG_LIMIT", DEFAULT_LIVE_DEBUG_LIMIT)).strip()
     env.update(
         {
-            "APP_DATABASE_FILE": str(workspace / "data" / "live.sqlite3"),
             "ACCOUNT_STATE_DIR": str(workspace / "state"),
             "RUN_HEADLESS": "true",
             "SKIP_AI_ANALYSIS": "false",

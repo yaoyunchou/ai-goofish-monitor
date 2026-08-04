@@ -127,7 +127,7 @@ python spider_v2.py --debug-limit 3
 
 | 路径 | 说明 |
 |------|------|
-| `data/app.sqlite3` | 任务、结果等主数据 |
+| `.env` → `DATABASE_URL` | PostgreSQL（Supabase 等），任务与结果主数据 |
 | `state/` | 闲鱼登录态 JSON |
 | `prompts/` | AI 分析 Prompt |
 | `logs/` | 运行日志 |

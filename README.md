@@ -56,23 +56,20 @@ docker compose up -d
 - 官方镜像地址：`ghcr.io/usagi-org/ai-goofish:latest`
 - 更新镜像：`docker compose pull && docker compose up -d`
 - 如果你修改了 `.env` 中的 `SERVER_PORT`，请同步更新 `docker-compose.yaml` 里的端口映射。
-- `docker-compose.yaml` 默认会把 SQLite 主库挂载到 `./data:/app/data`，数据库文件默认为 `data/app.sqlite3`
-- 目前默认持久化这些目录：
-    - `data/`  SQLite 主存储（任务、结果、价格历史）
+- **数据库**：在 `.env` 配置 `DATABASE_URL`（PostgreSQL / Supabase），Docker 不再挂载 SQLite 文件。
+- 默认持久化这些目录：
     - `state/`  登录状态 cookie 文件
     - `prompts/`  任务提示词
     - `logs/`  运行日志
     - `images/`  商品图片与任务临时图片目录
-    - `config.json`、`jsonl/`、`price_history/`  首次升级到 SQLite 时用于兼容导入的旧数据源
+    - `config.json`、`jsonl/`、`price_history/`  首次启动时用于向 Postgres 导入历史数据（表为空时）
 
-### 数据存储与迁移
+### 数据存储
 
-- 当前在线主存储为 SQLite，默认路径 `data/app.sqlite3`
-- 可通过环境变量 `APP_DATABASE_FILE` 自定义数据库路径；Docker 默认设置为 `/app/data/app.sqlite3`
-- 应用启动时会自动建库建表，并尝试从旧的 `config.json`、`jsonl/`、`price_history/` 导入一次历史数据
-- `state/`、`prompts/`、`logs/`、`images/` 仍然是文件系统目录，不在 SQLite 中
-- 商品图片会临时落到 `images/task_images_<task_name>/`，任务结束后默认会清理
-- 首次升级完成并确认 `data/app.sqlite3` 中数据正确后，可视部署方式决定是否继续保留旧的 `config.json`、`jsonl/`、`price_history/` 挂载
+- 主数据在 **PostgreSQL**（环境变量 `DATABASE_URL`）
+- 启动时自动连接数据库；表为空时会尝试从 `config.json`、`jsonl/`、`price_history/` 导入一次
+- `state/`、`prompts/`、`logs/`、`images/` 仍在文件系统
+- 商品图片临时目录 `images/task_images_<task_name>/`，任务结束后默认清理
 
 ### 最少配置
 
@@ -84,6 +81,7 @@ docker compose up -d
 | `OPENAI_MODEL_NAME` | 支持图片输入的模型名称 | 是* |
 | `CURSOR_API_KEY` | Cursor API Key（`AI_PROVIDER=cursor` 时） | 是* |
 | `CURSOR_MODEL_NAME` | Cursor 模型 ID，如 `composer-2.5` | 是* |
+| `DATABASE_URL` | PostgreSQL 连接串（Supabase Session pooler 等） | 是 |
 | `WEB_USERNAME` / `WEB_PASSWORD` | Web UI 登录账号密码，默认 `admin/admin123` | 否 |
 
 \* 按所选 `AI_PROVIDER` 填写对应项，详见 [AI 提供方配置](./docs/ai-provider.md)。
@@ -125,7 +123,7 @@ docker compose up -d
 
 ### 结果查看与运行日志
 
-- 结果页和导出功能现在从 SQLite 查询，不再直接扫描 `jsonl` 文件。
+- 结果页和导出从 **PostgreSQL** 查询，不再直接扫描 `jsonl` 文件。
 - 日志页按任务展示运行过程，便于排查登录态失效、风控和 AI 调用问题。
 
 ### 系统设置
@@ -174,9 +172,8 @@ npm install
 npm run dev
 ```
 
-- FastAPI 启动时会自动初始化 SQLite，并在首次启动时尝试导入旧的 `config.json/jsonl/price_history`
-- `spider_v2.py` 默认从 SQLite 读取任务；只有显式传入 `--config <path>` 时才会走 JSON 配置兼容模式
-- 默认数据库路径为 `data/app.sqlite3`
+- FastAPI 启动时连接 PostgreSQL；表为空时会尝试从 `config.json` / `jsonl/` / `price_history` 导入
+- `spider_v2.py` 从数据库读取任务；仅 `--config <path>` 时使用 JSON 兼容模式
 - Vite 开发服务器会将 `/api`、`/auth`、`/ws` 代理到 `http://127.0.0.1:8000`。
 - `npm run build` 先生成 `web-ui/dist/`，`start.sh` 再复制到仓库根目录 `dist/`。
 - FastAPI 负责提供根目录 `dist/index.html` 和 `dist/assets/`。

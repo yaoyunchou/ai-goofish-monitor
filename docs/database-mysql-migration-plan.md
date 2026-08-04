@@ -1,6 +1,8 @@
 # SQLite → MySQL 迁移计划
 
-本文档描述将 `ai-goofish-monitor` 从 **SQLite（`data/app.sqlite3`）** 迁到 **MySQL 8.x** 的范围、阶段与验收标准。当前代码以同步 `sqlite3` + `asyncio.to_thread` 为主，表结构定义在 `src/infrastructure/persistence/sqlite_connection.py`。
+> **归档说明**：本项目已改为 **PostgreSQL（Supabase）** 作为主库；下文中的 SQLite / `sqlite_connection.py` 等为历史方案，仅作 MySQL 迁移计划参考。
+
+本文档描述将 `ai-goofish-monitor` 从关系型本地库迁到 **MySQL 8.x** 的范围、阶段与验收标准（当前生产实现为 **Postgres**，见 `docs/database-supabase-integration.md`）。
 
 ---
 

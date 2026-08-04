@@ -2,6 +2,14 @@
 
 ## 2026-08-04
 
+### chore(docs): 全面去除 SQLite 文档与配置残留
+
+- README / README_EN / user-guide / AGENTS / database-supabase-integration 统一为仅 PostgreSQL
+- `.env` 示例与备份注释去掉 `DATABASE_DRIVER`、`APP_DATABASE_FILE`
+- `storage_names` 重命名为 `LEGACY_SQLITE_MIGRATION_SOURCE`（仅迁移脚本）
+- live 测试不再注入 `APP_DATABASE_FILE`
+- MySQL 迁移计划文档标注为归档参考
+
 ### feat(db): SQLite → Postgres 迁移 CLI + 运行时仅 Postgres
 
 - 新增 `python3 -m scripts.migrate_sqlite_to_postgres`（保留 tasks/result_items 等主键 id）
