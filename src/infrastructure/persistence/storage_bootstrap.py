@@ -16,6 +16,7 @@ from src.infrastructure.persistence.sql_dialect import (
     json_text,
     upsert_app_metadata_sql,
 )
+from src.infrastructure.persistence.config_task_sync import sync_missing_tasks_from_config
 from src.infrastructure.persistence.storage_names import (
     build_result_filename,
     normalize_keyword_from_filename,
@@ -43,6 +44,7 @@ def bootstrap_storage(
         with db_connection(db_path) as conn:
             ensure_schema(conn)
             _import_tasks_if_needed(conn, legacy_config_file)
+            sync_missing_tasks_from_config(conn, legacy_config_file)
             _import_results_if_needed(conn, legacy_result_dir)
             _import_price_snapshots_if_needed(conn, legacy_price_history_dir)
 

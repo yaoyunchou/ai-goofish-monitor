@@ -2,6 +2,10 @@
 新架构的主应用入口
 整合所有路由和服务
 """
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles

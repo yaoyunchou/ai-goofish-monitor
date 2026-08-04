@@ -1,5 +1,8 @@
 """
 任务仓储工厂。
+
+说明：实现类仍名为 SqliteTaskRepository（历史命名），实际通过 db_connection()
+按 .env 数据库配置连接远程库或本地文件，并非固定本地文件库。
 """
 from __future__ import annotations
 
