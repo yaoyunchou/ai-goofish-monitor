@@ -2,6 +2,12 @@
 
 ## 2026-08-04
 
+### chore(tasks): 新增关键词任务「天才知音故事机」
+
+- `decision_mode=keyword`，搜索词为「天才知音全新儿童故事机早教机智能学习机随身听」
+- 匹配规则：`天才知音`、`故事机`（标题命中即关键词推荐，不走 AI 看图）
+- 绑定账号 `state/xy699909515578.json`，cron 每 2 小时，`task id=1`
+
 ### chore(ops): 刷新闲鱼 Cookie 登录态
 
 - 更新 `state/xy699909515578.json`（多域名 `.goofish.com` / `.taobao.com` 展开，便于 Playwright 携带）
