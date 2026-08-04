@@ -2,6 +2,11 @@
 
 ## 2026-08-04
 
+### chore(tasks): 新增监控任务「机乐堂30w多口充电头」
+
+- 通过 API 写入 Supabase `tasks` 表（AI 判定、看图、价格 30–150、cron 每 2 小时）
+- 新增 `prompts/机乐堂_30w多口充电头_criteria.txt`
+
 ### chore(docs): 全面去除 SQLite 文档与配置残留
 
 - README / README_EN / user-guide / AGENTS / database-supabase-integration 统一为仅 PostgreSQL
@@ -64,6 +69,14 @@
 - 任务「机乐堂30W充电头」由关键词 OR 模式改为 `decision_mode=ai`，启用看图分析
 - 新增 `prompts/机乐堂_30w_充电头_criteria.txt`（品牌一票否决、排除卡斐乐等非机乐堂）
 - 结果集 `机乐堂_30w_充电头_full_data.jsonl` 配置展示黑名单关键词，便于结果页过滤误匹配
+
+## 2026-08-04
+
+### chore(ops): 导入闲鱼 Cookie 至账号管理
+
+- 将用户提供的 Cookie 请求头转换为 Playwright `cookies` JSON，写入 `state/xy699909515578.json`（账号名取自 `tracknick`）
+- 任务「机乐堂30w多口充电头」已绑定 `account_strategy=fixed` 与上述登录态文件
+- 临时导入文件已删除；`state/` 仍在 `.gitignore`，不会进入版本库
 
 ## 2026-07-30
 
