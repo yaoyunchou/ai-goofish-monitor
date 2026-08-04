@@ -1,5 +1,13 @@
 # 变更日志
 
+## 2026-08-04
+
+### chore(tasks): 新增监控任务「机乐堂30w多口充电头」
+
+- `config.json` 增加 AI 判定任务：关键词 `机乐堂30w多口充电头`，每 30 分钟调度，最高价 ¥120，个人闲置 + 包邮
+- 新增 `prompts/机乐堂30w多口充电头_criteria.txt`（品牌一票否决、排除纯数据线与非机乐堂贴牌）
+- 结果集 `机乐堂30w多口充电头_full_data.jsonl` 预置展示黑名单：卡斐乐、数据线等
+
 ## 2026-08-03
 
 ### feat(db): DATABASE_DRIVER=postgres（Supabase / psycopg）
