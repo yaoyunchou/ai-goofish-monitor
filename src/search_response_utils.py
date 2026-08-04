@@ -43,4 +43,12 @@ def summarize_search_payload(payload: Any, *, max_keys: int = 12) -> str:
         rl_info = "missing"
     else:
         rl_info = f"non-list:{type(items).__name__}"
-    return f"ret={ret!r}, data_keys={keys}, resultList={rl_info}"
+    base = f"ret={ret!r}, data_keys={keys}, resultList={rl_info}"
+    ret_text = " ".join(str(x) for x in (ret or []))
+    if "ILLEGAL_ACCESS" in ret_text or "FAIL_SYS" in ret_text:
+        base += (
+            " | 含义: 接口判定请求非法(常见: Cookie/_m_h5_tk 失效、签名不匹配、"
+            "仅粘贴 Cookie 未带完整浏览器环境、或 headless 被风控)。"
+            "请用 Chrome 扩展导出完整登录态并更新 state/*.json，或 RUN_HEADLESS=false 重试。"
+        )
+    return base
