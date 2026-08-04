@@ -22,6 +22,9 @@ if str(_REPO_ROOT) not in sys.path:
 from src.infrastructure.persistence.database_config import get_postgres_dsn  # noqa: E402
 from src.infrastructure.persistence.storage_names import LEGACY_SQLITE_MIGRATION_SOURCE  # noqa: E402
 
+# 兼容旧脚本/文档中的名称
+DEFAULT_DATABASE_PATH = LEGACY_SQLITE_MIGRATION_SOURCE
+
 TABLE_ORDER = (
     "app_metadata",
     "tasks",
