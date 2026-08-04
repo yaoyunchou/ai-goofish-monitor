@@ -12,14 +12,11 @@ import os
 import sys
 from pathlib import Path
 
-from dotenv import load_dotenv
-
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-load_dotenv(_REPO_ROOT / ".env", override=False)
-
+from src.infrastructure.config.env_manager import env_manager  # noqa: E402
 from src.infrastructure.persistence.database_config import (  # noqa: E402
     get_database_driver,
     get_postgres_dsn,
@@ -50,10 +47,15 @@ def _mask_dsn(dsn: str) -> str:
 
 def main() -> int:
     driver = get_database_driver()
-    print(f"DATABASE_DRIVER={driver}")
+    print(f"DATABASE_DRIVER={driver} (source: {env_manager.config_source('DATABASE_DRIVER')})")
     if is_postgres():
         dsn = get_postgres_dsn()
-        print(f"DATABASE_URL={_mask_dsn(dsn)}")
+        print(f"DATABASE_URL={_mask_dsn(dsn)} (source: {env_manager.config_source('DATABASE_URL')})")
+        if env_manager.config_source("DATABASE_URL") == "process_env" and env_manager.env_file.exists():
+            print(
+                "提示: 当前 DATABASE_URL 来自进程环境（如 Cursor Secrets），"
+                "与仓库 .env 不一致时请在 Secrets 中更新，或从 .env 删除/同步该键。"
+            )
 
     errors: list[str] = []
     try:
@@ -96,10 +98,18 @@ def main() -> int:
     except Exception as exc:  # noqa: BLE001
         print(f"连接: 失败 — {exc}")
         if is_postgres():
-            print(
-                "\n提示: Supabase Direct 在部分环境仅解析 IPv6，可改用 Session pooler 连接串，"
-                "或在 Supabase 开启 IPv4 附加项。详见 docs/database-supabase-integration.md"
-            )
+            err = str(exc).lower()
+            if "password authentication failed" in err:
+                print(
+                    "\n提示: 密码认证失败。请确认使用 Database password（非 API JWT）；"
+                    "若刚重置密码，可在 Supabase 执行 Restart project 并稍候再试。"
+                    "详见 docs/database-supabase-integration.md"
+                )
+            else:
+                print(
+                    "\n提示: Supabase Direct 在部分环境仅解析 IPv6，可改用 Session pooler 连接串，"
+                    "或在 Supabase 开启 IPv4 附加项。详见 docs/database-supabase-integration.md"
+                )
         return 1
 
     if errors:

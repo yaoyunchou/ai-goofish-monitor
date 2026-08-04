@@ -2,7 +2,11 @@
 
 ## 2026-08-03
 
-### feat(results): 结果页收录与 SKU 详情
+### feat(settings): 系统状态页展示运行环境摘要
+
+- `GET /api/settings/status` 增加 `runtime`（配置来源、数据库驱动、不含密钥）
+- 设置 → **系统状态** 表格展示关键环境变量
+
 
 - 结果卡片新增「收录」按钮，收录后跳转 `/results/collected/:id`
 - 后端 `collected_items` 表 + `/api/collections`：收录后 Playwright 拉取详情页 SKU/价格

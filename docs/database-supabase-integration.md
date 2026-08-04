@@ -117,9 +117,18 @@ pip install -r requirements.txt
 python3 -m scripts.verify_database
 ```
 
-脚本会检查核心表行数并对 `app_metadata` 做读写探针（不打印密码）。
+脚本会检查核心表行数并对 `app_metadata` 做读写探针（不打印密码）。输出中会标注 `DATABASE_*` 来自 `env_file` 还是 `process_env`（如 Cursor Secrets）。
 
-在已安装 `psycopg` 的机器上（密码勿泄露）：
+### 配置优先级（与 Web「系统状态」一致）
+
+| 顺序 | 来源 | 说明 |
+|------|------|------|
+| 1 | 仓库根目录 **`.env`** | `env_manager` / 数据库连接 / `verify_database` 均**优先**读文件 |
+| 2 | **进程环境变量** | 仅当 `.env` 中**没有**该键时生效（如 Cursor Cloud **Secrets**） |
+
+因此：本机改好 `.env` 后，在 Cloud Agent 若仍连错库，请检查 Secrets 是否仍注入旧的 `DATABASE_URL`；或在 `.env` 中保留正确值（会覆盖 Secret）。Web 保存设置会写回 `.env`。
+
+---
 
 ```bash
 # 使用控制台复制的 URI，或：

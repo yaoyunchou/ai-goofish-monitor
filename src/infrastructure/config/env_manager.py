@@ -49,6 +49,18 @@ class EnvManager:
 
         return default
 
+    def config_source(self, key: str) -> str:
+        """返回配置来源：env_file | process_env | unset"""
+        if self.env_file.exists():
+            env_vars = self.read_env()
+            value = env_vars.get(key)
+            if value is not None and str(value).strip() != "":
+                return "env_file"
+        runtime = os.getenv(key)
+        if runtime is not None and str(runtime).strip() != "":
+            return "process_env"
+        return "unset"
+
     def update_values(self, updates: Dict[str, str]) -> bool:
         """批量更新环境变量"""
         return self.apply_changes(updates=updates)

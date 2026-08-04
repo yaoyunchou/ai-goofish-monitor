@@ -75,6 +75,12 @@ async function handleTestNotification(payload: {
   }
 }
 
+function runtimeSourceLabel(source: string | undefined) {
+  if (source === 'env_file') return t('settings.status.sourceEnvFile')
+  if (source === 'process_env') return t('settings.status.sourceProcessEnv')
+  return t('settings.status.sourceUnset')
+}
+
 async function handleSaveAi() {
   try {
     await saveAiSettings()
@@ -370,6 +376,58 @@ watch(selectedPrompt, async (value) => {
                         </div>
                     </div>
                 </div>
+              </div>
+
+              <div v-if="systemStatus.runtime" class="border-t pt-6 space-y-4">
+                <div>
+                  <h3 class="font-medium">{{ t('settings.status.runtimeTitle') }}</h3>
+                  <p class="text-sm text-gray-500">{{ t('settings.status.runtimeDescription') }}</p>
+                </div>
+                <dl class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <div class="p-3 border rounded-lg bg-gray-50">
+                    <dt class="text-gray-500">{{ t('settings.status.database') }}</dt>
+                    <dd class="font-mono font-medium">{{ systemStatus.runtime.database_driver }}</dd>
+                    <dd v-if="systemStatus.runtime.database_url?.set" class="text-xs text-gray-600 mt-1">
+                      {{ systemStatus.runtime.database_url.host }} / {{ systemStatus.runtime.database_url.database }}
+                    </dd>
+                    <dd v-else-if="systemStatus.runtime.sqlite_path" class="text-xs text-gray-600 mt-1">
+                      {{ systemStatus.runtime.sqlite_path }}
+                    </dd>
+                  </div>
+                  <div class="p-3 border rounded-lg bg-gray-50">
+                    <dt class="text-gray-500">AI_PROVIDER</dt>
+                    <dd class="font-mono">{{ systemStatus.runtime.ai_provider }} · {{ systemStatus.runtime.cursor_runtime_effective }}</dd>
+                  </div>
+                  <div class="p-3 border rounded-lg bg-gray-50">
+                    <dt class="text-gray-500">SERVER_PORT</dt>
+                    <dd class="font-mono">{{ systemStatus.runtime.server_port }}</dd>
+                  </div>
+                  <div class="p-3 border rounded-lg bg-gray-50">
+                    <dt class="text-gray-500">{{ t('settings.status.cursorAgent') }}</dt>
+                    <dd>{{ systemStatus.runtime.cursor_agent ? t('common.active') : t('common.inactive') }}</dd>
+                  </div>
+                </dl>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-xs border rounded-lg">
+                    <thead class="bg-gray-100">
+                      <tr>
+                        <th class="text-left p-2">变量</th>
+                        <th class="text-left p-2">已设置</th>
+                        <th class="text-left p-2">来源</th>
+                        <th class="text-left p-2">值（非敏感）</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(meta, key) in systemStatus.runtime.variables" :key="key" class="border-t">
+                        <td class="p-2 font-mono">{{ key }}</td>
+                        <td class="p-2">{{ meta.set ? '✓' : '—' }}</td>
+                        <td class="p-2">{{ runtimeSourceLabel(meta.source) }}</td>
+                        <td class="p-2 font-mono text-gray-600">{{ meta.value ?? '—' }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p class="text-xs text-gray-500 break-all">.env: {{ systemStatus.runtime.env_file_path }}</p>
               </div>
             </div>
             <div v-else class="text-center py-8 text-gray-500">

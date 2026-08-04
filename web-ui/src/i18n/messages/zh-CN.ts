@@ -272,6 +272,13 @@ const zhCN = {
       channels: '通知渠道',
       none: '无',
       fetching: '正在获取系统状态...',
+      runtimeTitle: '当前进程运行环境',
+      runtimeDescription: '展示后端进程实际读到的配置来源（不显示密钥）。Cloud Secrets 显示为 process_env。',
+      sourceEnvFile: '.env 文件',
+      sourceProcessEnv: '进程环境变量',
+      sourceUnset: '未设置',
+      database: '数据库',
+      cursorAgent: 'Cursor Cloud Agent',
     },
     prompts: {
       title: 'Prompt 管理',

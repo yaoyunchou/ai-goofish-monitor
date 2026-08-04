@@ -15,7 +15,14 @@ repo_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(repo_root))
 
 # 测试固定使用 SQLite，避免本机 .env 中 DATABASE_DRIVER=postgres 连真实库
-os.environ["DATABASE_DRIVER"] = "sqlite"
+_pytest_env = repo_root / "data" / ".pytest-env"
+_pytest_env.parent.mkdir(parents=True, exist_ok=True)
+_pytest_env.write_text("DATABASE_DRIVER=sqlite\n", encoding="utf-8")
+
+from src.infrastructure.config.env_manager import env_manager
+
+env_manager.env_file = _pytest_env
+
 os.environ.pop("DATABASE_URL", None)
 
 from src.infrastructure.persistence.database_config import get_database_driver

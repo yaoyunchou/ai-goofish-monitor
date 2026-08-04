@@ -272,6 +272,13 @@ const enUS = {
       channels: 'Notification Channels',
       none: 'None',
       fetching: 'Loading system status...',
+      runtimeTitle: 'Runtime environment',
+      runtimeDescription: 'Effective config for this backend process (secrets hidden). Cloud Secrets appear as process_env.',
+      sourceEnvFile: '.env file',
+      sourceProcessEnv: 'Process environment',
+      sourceUnset: 'Not set',
+      database: 'Database',
+      cursorAgent: 'Cursor Cloud Agent',
     },
     prompts: {
       title: 'Prompt Management',

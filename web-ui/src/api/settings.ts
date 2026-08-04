@@ -108,6 +108,23 @@ export interface SystemStatus {
     webhook_headers_set: boolean
   }
   configured_notification_channels?: string[]
+  runtime?: RuntimeConfigSummary
+}
+
+export interface RuntimeConfigSummary {
+  env_file_path: string
+  env_file_exists: boolean
+  cursor_agent: boolean
+  server_port?: string
+  database_driver: string
+  database_url: { set: boolean; host: string | null; database: string | null }
+  sqlite_path?: string | null
+  ai_provider: string
+  cursor_runtime_effective: string
+  ai_configured: boolean
+  headless_mode: boolean
+  running_in_docker: boolean
+  variables: Record<string, { source: string; set: boolean; value?: string }>
 }
 
 export async function getNotificationSettings(): Promise<NotificationSettings> {

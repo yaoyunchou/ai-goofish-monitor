@@ -35,6 +35,7 @@ from src.services.notification_config_service import (
     prepare_notification_settings_update,
 )
 from src.services.notification_service import build_notification_service
+from src.infrastructure.config.runtime_status import build_runtime_config_summary
 from src.services.process_service import ProcessService
 
 
@@ -260,6 +261,7 @@ async def get_system_status(
             **build_notification_status_flags(notification_settings),
         },
         "configured_notification_channels": build_configured_channels(notification_settings),
+        "runtime": build_runtime_config_summary(),
     }
 
 

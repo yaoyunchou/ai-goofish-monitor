@@ -1,5 +1,14 @@
 # 变更日志
 
+## 2026-08-04
+
+### fix(config): 数据库配置与 env_manager 统一（.env 优先于 Secrets）
+
+- `database_config` 的 `DATABASE_DRIVER` / `DATABASE_URL` / `APP_DATABASE_FILE` 改为经 `env_manager.get_value` 解析，与 Web 设置、系统状态一致
+- `verify_database` 输出配置来源；密码失败与 IPv6 分开展示提示
+- `EnvManager.config_source()` 供运行时诊断
+- 测试使用 `data/.pytest-env`，避免仓库 `.env` 干扰
+
 ## 2026-08-03
 
 ### feat(db): DATABASE_DRIVER=postgres（Supabase / psycopg）
