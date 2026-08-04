@@ -1,18 +1,14 @@
 """
-方言相关 SQL 片段与类型辅助。
+PostgreSQL SQL 片段与类型辅助。
 """
 from __future__ import annotations
 
 import json
 from typing import Any
 
-from src.infrastructure.persistence.database_config import is_postgres
-
 
 def sql_true_condition(column: str) -> str:
-    if is_postgres():
-        return f"{column} IS TRUE"
-    return f"{column} = 1"
+    return f"{column} IS TRUE"
 
 
 def insert_result_item_ignore_sql() -> str:
@@ -22,15 +18,10 @@ def insert_result_item_ignore_sql() -> str:
         is_recommended, analysis_source, keyword_hit_count, raw_json
     """
     placeholders = ", ".join(["?"] * 16)
-    if is_postgres():
-        return f"""
-            INSERT INTO result_items ({columns})
-            VALUES ({placeholders})
-            ON CONFLICT (result_filename, link_unique_key) DO NOTHING
-        """
     return f"""
-        INSERT OR IGNORE INTO result_items ({columns})
+        INSERT INTO result_items ({columns})
         VALUES ({placeholders})
+        ON CONFLICT (result_filename, link_unique_key) DO NOTHING
     """
 
 
@@ -41,26 +32,17 @@ def insert_price_snapshot_ignore_sql() -> str:
         seller, publish_time, link
     """
     placeholders = ", ".join(["?"] * 15)
-    if is_postgres():
-        return f"""
-            INSERT INTO price_snapshots ({columns})
-            VALUES ({placeholders})
-            ON CONFLICT (keyword_slug, run_id, item_id) DO NOTHING
-        """
     return f"""
-        INSERT OR IGNORE INTO price_snapshots ({columns})
+        INSERT INTO price_snapshots ({columns})
         VALUES ({placeholders})
+        ON CONFLICT (keyword_slug, run_id, item_id) DO NOTHING
     """
 
 
 def upsert_app_metadata_sql() -> str:
-    if is_postgres():
-        return """
-            INSERT INTO app_metadata(key, value) VALUES (?, ?)
-            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
-        """
     return """
-        INSERT OR REPLACE INTO app_metadata(key, value) VALUES (?, ?)
+        INSERT INTO app_metadata(key, value) VALUES (?, ?)
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
     """
 
 
@@ -72,53 +54,42 @@ def upsert_task_sql() -> str:
         account_strategy, free_shipping, new_publish_option, region,
         decision_mode, keyword_rules_json, is_running
     """
-    if is_postgres():
-        return f"""
-            INSERT INTO tasks ({columns}) VALUES (
-                :id, :task_name, :enabled, :keyword, :description, :analyze_images,
-                :max_pages, :personal_only, :min_price, :max_price, :cron,
-                :ai_prompt_base_file, :ai_prompt_criteria_file, :account_state_file,
-                :account_strategy, :free_shipping, :new_publish_option, :region,
-                :decision_mode, :keyword_rules_json, :is_running
-            )
-            ON CONFLICT (id) DO UPDATE SET
-                task_name = EXCLUDED.task_name,
-                enabled = EXCLUDED.enabled,
-                keyword = EXCLUDED.keyword,
-                description = EXCLUDED.description,
-                analyze_images = EXCLUDED.analyze_images,
-                max_pages = EXCLUDED.max_pages,
-                personal_only = EXCLUDED.personal_only,
-                min_price = EXCLUDED.min_price,
-                max_price = EXCLUDED.max_price,
-                cron = EXCLUDED.cron,
-                ai_prompt_base_file = EXCLUDED.ai_prompt_base_file,
-                ai_prompt_criteria_file = EXCLUDED.ai_prompt_criteria_file,
-                account_state_file = EXCLUDED.account_state_file,
-                account_strategy = EXCLUDED.account_strategy,
-                free_shipping = EXCLUDED.free_shipping,
-                new_publish_option = EXCLUDED.new_publish_option,
-                region = EXCLUDED.region,
-                decision_mode = EXCLUDED.decision_mode,
-                keyword_rules_json = EXCLUDED.keyword_rules_json,
-                is_running = EXCLUDED.is_running
-        """
     return f"""
-        INSERT OR REPLACE INTO tasks ({columns}) VALUES (
+        INSERT INTO tasks ({columns}) VALUES (
             :id, :task_name, :enabled, :keyword, :description, :analyze_images,
             :max_pages, :personal_only, :min_price, :max_price, :cron,
             :ai_prompt_base_file, :ai_prompt_criteria_file, :account_state_file,
             :account_strategy, :free_shipping, :new_publish_option, :region,
             :decision_mode, :keyword_rules_json, :is_running
         )
+        ON CONFLICT (id) DO UPDATE SET
+            task_name = EXCLUDED.task_name,
+            enabled = EXCLUDED.enabled,
+            keyword = EXCLUDED.keyword,
+            description = EXCLUDED.description,
+            analyze_images = EXCLUDED.analyze_images,
+            max_pages = EXCLUDED.max_pages,
+            personal_only = EXCLUDED.personal_only,
+            min_price = EXCLUDED.min_price,
+            max_price = EXCLUDED.max_price,
+            cron = EXCLUDED.cron,
+            ai_prompt_base_file = EXCLUDED.ai_prompt_base_file,
+            ai_prompt_criteria_file = EXCLUDED.ai_prompt_criteria_file,
+            account_state_file = EXCLUDED.account_state_file,
+            account_strategy = EXCLUDED.account_strategy,
+            free_shipping = EXCLUDED.free_shipping,
+            new_publish_option = EXCLUDED.new_publish_option,
+            region = EXCLUDED.region,
+            decision_mode = EXCLUDED.decision_mode,
+            keyword_rules_json = EXCLUDED.keyword_rules_json,
+            is_running = EXCLUDED.is_running
     """
 
 
-def as_sql_bool(value: Any) -> int | bool:
+def as_sql_bool(value: Any) -> bool:
     if isinstance(value, bool):
-        return value if is_postgres() else int(value)
-    truthy = value is not None and str(value).strip().lower() in {"1", "true", "yes", "on"}
-    return truthy if is_postgres() else int(truthy)
+        return value
+    return value is not None and str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
 def parse_json_field(value: Any, *, default: Any):
@@ -133,17 +104,11 @@ def parse_json_field(value: Any, *, default: Any):
 
 
 def insert_collected_item_sql() -> str:
-    if is_postgres():
-        return """
-            INSERT INTO collected_items (
-                result_item_id, collected_at, sku_fetch_status
-            ) VALUES (?, ?, 'pending')
-            RETURNING id
-        """
     return """
         INSERT INTO collected_items (
             result_item_id, collected_at, sku_fetch_status
         ) VALUES (?, ?, 'pending')
+        RETURNING id
     """
 
 
@@ -151,4 +116,3 @@ def json_text(value: Any) -> str:
     if isinstance(value, str):
         return value
     return json.dumps(value, ensure_ascii=False)
-

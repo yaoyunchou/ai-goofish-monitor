@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from src.api import dependencies as deps
 from src.api.routes import dashboard
 from src.domain.models.task import TaskCreate
-from src.infrastructure.persistence.sqlite_task_repository import SqliteTaskRepository
+from tests.fakes.memory_task_repository import InMemoryTaskRepository
 from src.services.task_service import TaskService
 
 
@@ -22,10 +22,7 @@ def test_dashboard_summary_aggregates_tasks_and_results(tmp_path, monkeypatch):
     jsonl_dir = tmp_path / "jsonl"
     jsonl_dir.mkdir(parents=True, exist_ok=True)
 
-    repository = SqliteTaskRepository(
-        db_path=str(tmp_path / "app.sqlite3"),
-        legacy_config_file=None,
-    )
+    repository = InMemoryTaskRepository()
     task_service = TaskService(repository)
     app = FastAPI()
     app.include_router(dashboard.router)

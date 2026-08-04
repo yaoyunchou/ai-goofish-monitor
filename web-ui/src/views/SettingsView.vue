@@ -390,9 +390,7 @@ watch(selectedPrompt, async (value) => {
                     <dd v-if="systemStatus.runtime.database_url?.set" class="text-xs text-gray-600 mt-1">
                       {{ systemStatus.runtime.database_url.host }} / {{ systemStatus.runtime.database_url.database }}
                     </dd>
-                    <dd v-else-if="systemStatus.runtime.sqlite_path" class="text-xs text-gray-600 mt-1">
-                      {{ systemStatus.runtime.sqlite_path }}
-                    </dd>
+                    <dd v-else class="text-xs text-gray-600 mt-1">—</dd>
                   </div>
                   <div class="p-3 border rounded-lg bg-gray-50">
                     <dt class="text-gray-500">AI_PROVIDER</dt>

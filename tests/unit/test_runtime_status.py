@@ -4,7 +4,6 @@ from src.infrastructure.config.runtime_status import build_runtime_config_summar
 def test_runtime_summary_masks_database_url(monkeypatch, tmp_path):
     env_file = tmp_path / ".env"
     env_file.write_text(
-        "DATABASE_DRIVER=postgres\n"
         "DATABASE_URL=postgresql://postgres:secret@db.example.com:5432/mydb\n",
         encoding="utf-8",
     )

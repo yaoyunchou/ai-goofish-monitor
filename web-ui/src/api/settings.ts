@@ -118,7 +118,6 @@ export interface RuntimeConfigSummary {
   server_port?: string
   database_driver: string
   database_url: { set: boolean; host: string | null; database: string | null }
-  sqlite_path?: string | null
   ai_provider: string
   cursor_runtime_effective: string
   ai_configured: boolean

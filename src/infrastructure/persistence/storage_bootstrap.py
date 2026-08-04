@@ -47,9 +47,6 @@ def bootstrap_storage(
             _import_price_snapshots_if_needed(conn, legacy_price_history_dir)
 
 
-bootstrap_sqlite_storage = bootstrap_storage
-
-
 def _table_is_empty(conn: DbConnection, table_name: str) -> bool:
     row = conn.execute(f"SELECT COUNT(1) AS total FROM {table_name}").fetchone()
     return row is None or int(row["total"]) == 0

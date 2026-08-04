@@ -1,5 +1,5 @@
 """
-基于 SQLite 的任务仓储实现。
+任务仓储（PostgreSQL）。
 """
 from __future__ import annotations
 
@@ -38,9 +38,7 @@ def find_task_by_name_sync(task_name: str) -> Task | None:
     return _row_to_task(row) if row else None
 
 
-class SqliteTaskRepository(TaskRepository):
-    """基于 SQLite 的任务仓储"""
-
+class TaskDbRepository(TaskRepository):
     def __init__(
         self,
         db_path: str | None = None,

@@ -2,6 +2,13 @@
 
 ## 2026-08-04
 
+### feat(db): SQLite → Postgres 迁移 CLI + 运行时仅 Postgres
+
+- 新增 `python3 -m scripts.migrate_sqlite_to_postgres`（保留 tasks/result_items 等主键 id）
+- 移除运行时 SQLite：`db_connection` 仅连 `DATABASE_URL`；删除 `sqlite_connection` 等
+- 测试任务 API 使用 `InMemoryTaskRepository`，不连真实库
+- `.env.example` 仅保留 `DATABASE_URL`
+
 ### fix(config): 数据库配置与 env_manager 统一（.env 优先于 Secrets）
 
 - `database_config` 的 `DATABASE_DRIVER` / `DATABASE_URL` / `APP_DATABASE_FILE` 改为经 `env_manager.get_value` 解析，与 Web 设置、系统状态一致

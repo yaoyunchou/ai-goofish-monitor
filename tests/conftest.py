@@ -14,10 +14,10 @@ from fastapi.testclient import TestClient
 repo_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(repo_root))
 
-# 测试固定使用 SQLite，避免本机 .env 中 DATABASE_DRIVER=postgres 连真实库
+# 测试不连接 Supabase：使用隔离的空 .env
 _pytest_env = repo_root / "data" / ".pytest-env"
 _pytest_env.parent.mkdir(parents=True, exist_ok=True)
-_pytest_env.write_text("DATABASE_DRIVER=sqlite\n", encoding="utf-8")
+_pytest_env.write_text("# pytest isolated env\n", encoding="utf-8")
 
 from src.infrastructure.config.env_manager import env_manager
 
@@ -25,13 +25,9 @@ env_manager.env_file = _pytest_env
 
 os.environ.pop("DATABASE_URL", None)
 
-from src.infrastructure.persistence.database_config import get_database_driver
-
-get_database_driver.cache_clear()
-
 from src.api import dependencies as deps
 from src.api.routes import tasks
-from src.infrastructure.persistence.sqlite_task_repository import SqliteTaskRepository
+from tests.fakes.memory_task_repository import InMemoryTaskRepository
 from src.services.task_service import TaskService
 from src.services.task_generation_service import TaskGenerationService
 
@@ -118,12 +114,8 @@ class FakeSchedulerService:
 def api_context(tmp_path):
     config_file = tmp_path / "config.json"
     config_file.write_text("[]", encoding="utf-8")
-    db_path = tmp_path / "app.sqlite3"
 
-    repository = SqliteTaskRepository(
-        db_path=str(db_path),
-        legacy_config_file=None,
-    )
+    repository = InMemoryTaskRepository()
     task_service = TaskService(repository)
     process_service = FakeProcessService()
     scheduler_service = FakeSchedulerService()
@@ -162,7 +154,7 @@ def api_context(tmp_path):
     return {
         "app": app,
         "config_file": config_file,
-        "db_path": db_path,
+        "db_path": None,
         "process_service": process_service,
         "scheduler_service": scheduler_service,
         "task_generation_service": task_generation_service,

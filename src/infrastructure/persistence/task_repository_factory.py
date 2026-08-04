@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from src.domain.repositories.task_repository import TaskRepository
-from src.infrastructure.persistence.sqlite_task_repository import SqliteTaskRepository
+from src.infrastructure.persistence.task_repository import TaskDbRepository
 
 
 def create_task_repository(
@@ -12,7 +12,7 @@ def create_task_repository(
     *,
     legacy_config_file: str | None = "config.json",
 ) -> TaskRepository:
-    return SqliteTaskRepository(
+    return TaskDbRepository(
         db_path=db_path,
         legacy_config_file=legacy_config_file,
     )

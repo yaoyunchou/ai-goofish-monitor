@@ -94,19 +94,32 @@ APP_DATABASE_FILE=data/app.sqlite3
 
 ---
 
-## 5. 应用侧还要改什么（才能真用上 Supabase）
+> **重要**：应用**仅使用 PostgreSQL**（`.env` 中 `DATABASE_URL`，推荐 Supabase Session pooler）。历史 `data/app.sqlite3` 请用迁移脚本导入。
 
-代码现状：全部走 `sqlite_connection` + `SqliteTaskRepository`。
+---
 
-切换步骤（与 MySQL 计划相同，方言改为 Postgres）：
+## 5. 从 SQLite 迁移数据（一次性）
 
-1. `DATABASE_DRIVER=postgres` + `DATABASE_URL`
-2. 实现 Postgres 仓储（或 SQLAlchemy + Alembic）
-3. `INSERT OR IGNORE` → `ON CONFLICT DO NOTHING` 等
-4. 可选 CLI：`sqlite → postgres` 数据迁移（保留 `result_items.id` 以兼容 `collected_items` 外键）
-5. 集成测试在 Supabase **分支库** 或本地 `supabase start` 上跑
+1. 确认 Supabase 已执行 `supabase/migrations/20260803120000_initial_goofish_schema.sql`
+2. `.env` 中配置好 `DATABASE_URL`
+3. 在本机执行（先 dry-run）：
 
-- 代码已支持 `DATABASE_DRIVER=postgres` + `DATABASE_URL`（`psycopg` 直连）；切换后重启 API/爬虫
+```bash
+python3 -m scripts.migrate_sqlite_to_postgres --source data/app.sqlite3 --dry-run
+python3 -m scripts.migrate_sqlite_to_postgres --source data/app.sqlite3
+python3 -m scripts.verify_database
+```
+
+4. 重启 API / 爬虫；Web 核对任务数、结果条数
+
+可选：`--tables tasks,result_items` 只迁部分表。
+
+---
+
+## 5b. 应用架构（当前）
+
+- **Vue → FastAPI → PostgreSQL**（`psycopg`）
+- 启动时 `bootstrap_storage()` 仅在表为空时从 `config.json` / `jsonl/` 导入
 
 ---
 
