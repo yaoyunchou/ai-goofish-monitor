@@ -2,6 +2,7 @@ import json
 from datetime import datetime
 
 from src.config import AI_DEBUG_MODE
+from src.search_response_utils import extract_search_result_list, summarize_search_payload
 from src.utils import safe_get
 
 
@@ -9,9 +10,10 @@ async def _parse_search_results_json(json_data: dict, source: str) -> list:
     """解析搜索API的JSON数据，返回基础商品信息列表。"""
     page_data = []
     try:
-        items = await safe_get(json_data, "data", "resultList", default=[])
+        items = extract_search_result_list(json_data)
         if not items:
             print(f"LOG: ({source}) API响应中未找到商品列表 (resultList)。")
+            print(f"LOG: ({source}) [搜索诊断] {summarize_search_payload(json_data)}")
             if AI_DEBUG_MODE:
                 print(f"--- [SEARCH DEBUG] RAW JSON RESPONSE from {source} ---")
                 print(json.dumps(json_data, ensure_ascii=False, indent=2))

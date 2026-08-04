@@ -2,7 +2,14 @@
 
 ## 2026-08-04
 
-### chore(tasks): 新增关键词任务「天才知音故事机」
+### fix(scraper): 搜索 resultList 解析与响应选择
+
+- 支持 MTOP `data` 为 JSON 字符串时解包 `resultList`（此前只读 `data.resultList` 对象形式）
+- 筛选后优先选用 **非空** 的 initial/final 搜索响应，避免「个人闲置」等把有效首屏数据覆盖为空
+- 首屏与筛选均无列表时滚动触发一次搜索 API 重试
+- 空列表时输出 `[搜索诊断]`（ret、data_keys、resultList 长度）；`AI_DEBUG_MODE=true` 仍打印完整 JSON
+- 个人闲置筛选超时/失败时回退首屏响应，不再直接中断
+
 
 - `decision_mode=keyword`，搜索词为「天才知音全新儿童故事机早教机智能学习机随身听」
 - 匹配规则：`天才知音`、`故事机`（标题命中即关键词推荐，不走 AI 看图）

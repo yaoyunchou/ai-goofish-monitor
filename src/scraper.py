@@ -59,6 +59,7 @@ from src.services.price_history_service import (
 )
 from src.services.result_storage_service import load_processed_link_keys
 from src.services.seller_profile_cache import SellerProfileCache
+from src.services.search_response_selection import choose_search_response_for_parse
 from src.services.search_pagination import (
     advance_search_page,
     is_search_results_response,
@@ -770,13 +771,17 @@ async def scrape_xianyu(task_config: dict, debug_limit: int = 0):
                         print(f"LOG: 应用新发布筛选失败: {e}")
 
                 if personal_only:
-                    async with page.expect_response(
-                        is_search_results_response, timeout=20000
-                    ) as response_info:
-                        await page.click("text=个人闲置")
-                        # --- 修改: 将固定等待改为随机等待，并加长 ---
-                        await random_sleep(2, 4)  # 原来是 asyncio.sleep(5)
-                    final_response = await response_info.value
+                    try:
+                        async with page.expect_response(
+                            is_search_results_response, timeout=20000
+                        ) as response_info:
+                            await page.click("text=个人闲置")
+                            await random_sleep(2, 4)
+                        final_response = await response_info.value
+                    except PlaywrightTimeoutError:
+                        log_time("个人闲置筛选请求超时，继续使用首屏搜索响应。")
+                    except Exception as e:
+                        print(f"LOG: 应用个人闲置筛选失败: {e}")
 
                 if free_shipping:
                     try:
@@ -924,10 +929,10 @@ async def scrape_xianyu(task_config: dict, debug_limit: int = 0):
 
                 log_time("所有筛选已完成，开始处理商品列表...")
 
-                current_response = (
-                    final_response
-                    if final_response and final_response.ok
-                    else initial_response
+                current_response = await choose_search_response_for_parse(
+                    page,
+                    initial_response,
+                    final_response,
                 )
                 for page_num in range(1, max_pages + 1):
                     if stop_scraping:
