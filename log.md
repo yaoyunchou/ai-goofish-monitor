@@ -1,5 +1,13 @@
 # 变更日志
 
+## 2026-08-05
+
+### chore(dev): 本地一键 PostgreSQL + 前端构建
+
+- 新增 `docker-compose.dev.yml`：本机 Postgres 16，首次启动自动执行 `supabase/migrations/20260803120000_initial_goofish_schema.sql`
+- 从 `.env.example` 生成 `.env`，`DATABASE_URL` 指向 `127.0.0.1:5432/goofish`（与 compose 默认账号一致）
+- 完成 `pip install -r requirements.txt`、`playwright install chromium`、`web-ui` 生产构建（产物在根目录 `dist/`）
+
 ## 2026-08-04
 
 ### fix(scraper): 搜索 resultList 解析与响应选择

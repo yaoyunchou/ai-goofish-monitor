@@ -1,0 +1,27 @@
+# 本地开发用 PostgreSQL（无需 Supabase）
+# 用法：先启动 Docker Desktop，再执行
+#   docker compose -f docker-compose.dev.yml up -d
+# 然后在 .env 中设置：
+#   DATABASE_URL=postgresql+asyncpg://postgres:goofish@127.0.0.1:5432/goofish
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: goofish-postgres-dev
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: goofish
+      POSTGRES_DB: goofish
+    ports:
+      - "5432:5432"
+    volumes:
+      - goofish_pg_dev_data:/var/lib/postgresql/data
+      - ./supabase/migrations/20260803120000_initial_goofish_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d goofish"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  goofish_pg_dev_data:
