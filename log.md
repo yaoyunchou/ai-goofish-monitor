@@ -2,6 +2,10 @@
 
 ## 2026-08-04
 
+### chore(ops): 更新账号 user_874979280（蓝小飞鱼）登录态
+
+- 自 Cookie 请求头导入并覆盖 `state/user_874979280.json`（多域名展开）
+
 ### fix(scraper): 搜索 resultList 解析与响应选择
 
 - 支持 MTOP `data` 为 JSON 字符串时解包 `resultList`（此前只读 `data.resultList` 对象形式）
