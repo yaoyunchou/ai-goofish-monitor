@@ -69,6 +69,12 @@
 
 ## 2026-08-03
 
+### chore(env): 刷新 Cursor Cloud 开发环境并补充启动注意事项
+
+- update 脚本：`pip install -r requirements.txt` + `web-ui` 的 `npm install` + `playwright install chromium`（幂等）
+- `AGENTS.md` 新增 `## Cursor Cloud specific instructions`：`python3`、Vite 走 `localhost:5173`、Supabase `DATABASE_URL` 为 IPv6 直连且密码失效需把驱动回退为 sqlite、`pytest` 已强制 sqlite、master 上 10 个预存在失败用例、无 lint 仅 `vue-tsc`
+- 端到端验证：后端（sqlite）+ 前端 dev server 起服，Web UI 默认账号登录并创建监控任务成功
+
 ### feat(db): DATABASE_DRIVER=postgres（Supabase / psycopg）
 
 - 新增 `database_config`、`db_connection`、`sql_dialect`、`storage_bootstrap`

@@ -37,3 +37,13 @@
 - 复制 `.env.example` 为 `.env`，配置 **`DATABASE_URL`**（PostgreSQL）及 `AI_PROVIDER`（`openai` 或 `cursor`）与对应 API Key（见 `docs/ai-provider.md`、`docs/database-supabase-integration.md`）。
 - 不要提交真实凭据或 cookies（如 `state.json`）；Playwright 需本地浏览器，Docker 镜像已预装 Chromium。
 - Web 认证默认 `admin/admin123`，生产环境务必修改，推荐启用 HTTPS 并限制访问来源。
+
+## Cursor Cloud specific instructions
+本节面向在已执行 update 脚本（`pip install -r requirements.txt`、`web-ui` 的 `npm install`、`playwright install chromium`）后的 Cloud Agent，只记录非显而易见的启动/运行注意点，常规命令见 `AGENTS.md`/`CLAUDE.md`/`README.md`。
+
+- 解释器只有 `python3`，没有 `python`；`start.sh`、README 里的 `python -m ...` 需改用 `python3 -m ...`（如 `python3 -m src.app`）。
+- 依赖装在用户目录（`~/.local`），Playwright Chromium 与系统库 `libzbar0` 已随环境就绪，无需额外安装系统包。
+- 前端 dev server（`cd web-ui && npm run dev`）绑定的是 IPv6 loopback，请用 `http://localhost:5173` 访问，`http://127.0.0.1:5173` 会连不上；它把 `/api`、`/auth`、`/ws` 代理到后端 8000 端口。
+- 数据库坑（重要）：本环境把 `DATABASE_DRIVER` 设为非 sqlite 的 PG 驱动值，并注入了一个指向 `db.wkhatdhgohkpsqkytotz.supabase.co`（Supabase 直连）的 `DATABASE_URL` secret。该直连主机仅有 IPv6 记录，而 Cloud VM 只有 IPv4 出口，因此 `python3 -m src.app` 启动时会以 `Network is unreachable` 崩溃。经实测该项目位于 `ap-northeast-1`，但即便改用 IPv4 Session pooler（`aws-0-ap-northeast-1.pooler.supabase.com:5432`，用户名为「项目 ref 前缀」的 pooler 账号），注入的密码也会 `password authentication failed`。因此如需本地起服务，请在启动会话内把驱动覆盖为 sqlite（零配置默认路径，数据落到 `data/app.sqlite3`）：`DATABASE_DRIVER=sqlite python3 -m src.app`。若要让服务默认连 Supabase，需要项目所有者把 `DATABASE_URL` secret 更新为「IPv4 Session pooler 主机 + 正确 DB 密码」。
+- `pytest` 已在 `tests/conftest.py` 强制使用 sqlite 驱动，与上面的 secret 无关，可直接 `python3 -m pytest`。当前 `master` 上有 10 个预存在的失败用例（`test_ai_handler_analysis.py` 仍引用已重构掉的 `ai_handler.client`、`test_save_to_jsonl`/`test_item_detail_parser` 等期望旧数据结构），属历史用例未同步，并非环境问题。
+- 无 lint 工具（无 ruff/black/flake8/eslint）；唯一静态检查是前端 `npm run build` 内置的 `vue-tsc` 类型检查（产物输出到根目录 `dist/`）。
