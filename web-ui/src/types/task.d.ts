@@ -1,10 +1,16 @@
 // Based on the Pydantic model in the backend
 
+export type TaskType = 'keyword_search' | 'seller_subscription' | 'shop_datacompass'
+
 export interface Task {
   id: number;
   task_name: string;
   enabled: boolean;
   keyword: string;
+  task_type?: TaskType;
+  seller_user_ids?: string[];
+  seller_urls?: string[];
+  collect_ratings?: boolean;
   description: string;
   analyze_images: boolean;
   max_pages: number;
@@ -59,6 +65,10 @@ export type TaskUpdate = Partial<Omit<Task, 'id' | 'next_run_at'>>;
 export interface TaskGenerateRequest {
   task_name: string;
   keyword: string;
+  task_type?: TaskType;
+  seller_user_ids?: string[];
+  seller_urls?: string[];
+  collect_ratings?: boolean;
   description?: string;
   analyze_images?: boolean;
   personal_only?: boolean;

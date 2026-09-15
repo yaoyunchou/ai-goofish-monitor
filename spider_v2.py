@@ -10,6 +10,11 @@ import re
 from src.config import STATE_FILE
 from src.infrastructure.persistence.task_repository_factory import create_task_repository
 from src.scraper import scrape_xianyu
+from src.seller_subscription_scraper import (
+    scrape_registered_seller_subscriptions,
+    scrape_seller_subscription,
+)
+from src.scraper_shop_datacompass import scrape_shop_datacompass
 
 
 async def main():
@@ -31,7 +36,20 @@ async def main():
     parser.add_argument("--debug-limit", type=int, default=0, help="调试模式：每个任务仅处理前 N 个新商品（0 表示无限制）")
     parser.add_argument("--config", type=str, help="指定任务配置文件路径（传入时优先读取 JSON）")
     parser.add_argument("--task-name", type=str, help="只运行指定名称的单个任务 (用于定时任务调度)")
+    parser.add_argument(
+        "--seller-subscriptions",
+        action="store_true",
+        help="运行独立卖家订阅采集（读取 seller_subscriptions 表，不依赖任务配置）",
+    )
     args = parser.parse_args()
+
+    if args.seller_subscriptions:
+        print("--- 卖家订阅采集模式 ---")
+        if args.debug_limit > 0:
+            print(f"** 调试模式：最多处理 {args.debug_limit} 个商品 **")
+        saved = await scrape_registered_seller_subscriptions(debug_limit=args.debug_limit)
+        print(f"卖家订阅采集结束，本次入库 {saved} 条商品指标。")
+        return
 
     if args.config:
         if not os.path.exists(args.config):
@@ -102,13 +120,15 @@ async def main():
         if decision_mode not in {"ai", "keyword"}:
             decision_mode = "ai"
         task["decision_mode"] = decision_mode
+        task_type = str(task.get("task_type") or "keyword_search").strip()
+        task["task_type"] = task_type
         keyword_rules = task.get("keyword_rules")
         if keyword_rules is None and task.get("keyword_rule_groups") is not None:
             task["keyword_rules"] = flatten_legacy_groups(task.get("keyword_rule_groups") or [])
         else:
             task["keyword_rules"] = normalize_keywords(keyword_rules)
 
-        if decision_mode == "keyword":
+        if task_type in {"seller_subscription", "shop_datacompass"} or decision_mode == "keyword":
             task["ai_prompt_text"] = ""
             continue
 
@@ -189,7 +209,14 @@ async def main():
     tasks = []
     for task_conf in active_task_configs:
         print(f"-> 任务 '{task_conf['task_name']}' 已加入执行队列。")
-        tasks.append(asyncio.create_task(scrape_xianyu(task_config=task_conf, debug_limit=args.debug_limit)))
+        task_type = str(task_conf.get("task_type") or "keyword_search")
+        if task_type == "seller_subscription":
+            runner = scrape_seller_subscription
+        elif task_type == "shop_datacompass":
+            runner = scrape_shop_datacompass
+        else:
+            runner = scrape_xianyu
+        tasks.append(asyncio.create_task(runner(task_config=task_conf, debug_limit=args.debug_limit)))
 
     async def _shutdown_watcher():
         await stop_event.wait()

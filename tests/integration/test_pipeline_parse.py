@@ -28,10 +28,12 @@ def test_parse_user_head_and_items(load_json_fixture):
     head = asyncio.run(parse_user_head_data(head_json))
     assert head["卖家昵称"] == "seller_01"
     assert head["卖家收到的评价总数"] == 88
+    assert "卖家ID" in head
 
     items = asyncio.run(_parse_user_items_data(items_json))
     assert items[0]["商品状态"] == "在售"
     assert items[1]["商品状态"] == "已售"
+    assert items[0]["商品链接"].endswith("10001")
 
 
 def test_parse_ratings_and_reputation(load_json_fixture):

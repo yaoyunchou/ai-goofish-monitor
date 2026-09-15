@@ -21,7 +21,12 @@ from src.services.task_generation_runner import (
     run_ai_generation_job,
 )
 from src.services.task_payloads import serialize_task, serialize_tasks
-from src.domain.models.task import TaskCreate, TaskUpdate, TaskGenerateRequest
+from src.domain.models.task import (
+    TASK_TYPE_SELLER_SUBSCRIPTION,
+    TaskCreate,
+    TaskUpdate,
+    TaskGenerateRequest,
+)
 from src.prompt_utils import generate_criteria
 from src.utils import resolve_task_log_path
 from src.services.account_strategy_service import normalize_account_strategy
@@ -60,8 +65,9 @@ async def get_tasks(
     service: TaskService = Depends(get_task_service),
     scheduler_service: SchedulerService = Depends(get_scheduler_service),
 ):
-    """获取所有任务"""
+    """获取所有任务（不含卖家订阅，订阅在独立页面管理）"""
     tasks = await service.get_all_tasks()
+    tasks = [task for task in tasks if task.task_type != TASK_TYPE_SELLER_SUBSCRIPTION]
     return serialize_tasks(tasks, scheduler_service)
 @router.get("/{task_id}", response_model=dict)
 async def get_task(
@@ -218,15 +224,14 @@ async def delete_task(
     process_service: ProcessService = Depends(get_process_service),
     scheduler_service: SchedulerService = Depends(get_scheduler_service),
 ):
-    """删除任务"""
+    """删除任务（幂等：任务已不存在时也返回成功，避免重复点击报 404）"""
     task = await service.get_task(task_id)
     if not task:
-        raise HTTPException(status_code=404, detail="任务未找到")
+        await process_service.stop_task(task_id, quiet=True)
+        return {"message": "任务删除成功"}
 
-    await process_service.stop_task(task_id)
-    success = await service.delete_task(task_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="任务未找到")
+    await process_service.stop_task(task_id, quiet=True)
+    await service.delete_task(task_id)
     await _reload_scheduler_if_needed(service, scheduler_service)
     try:
         keyword = (task.keyword or "").strip()

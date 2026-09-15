@@ -2,10 +2,19 @@
 新架构的主应用入口
 整合所有路由和服务
 """
+import logging
+import logging.config
+import sys
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+
+from src.infrastructure.logging_config import UVICORN_LOG_CONFIG, configure_app_logging
+
+configure_app_logging()
+app_logger = logging.getLogger("app")
 
 from src.api.routes import (
     dashboard,
@@ -18,12 +27,17 @@ from src.api.routes import (
     websocket,
     accounts,
     collections,
+    seller_subscriptions,
+    shop_analytics,
 )
 from src.api.dependencies import (
     set_process_service,
     set_scheduler_service,
     set_task_generation_service,
 )
+from src.domain.seller_subscription import SELLER_SUBSCRIPTION_JOB_ID
+from src.services.seller_subscription_service import migrate_legacy_subscription_tasks
+from src.services.seller_subscription_storage import get_schedule, set_subscription_running
 from src.services.task_service import TaskService
 from src.services.process_service import ProcessService
 from src.services.scheduler_service import SchedulerService
@@ -41,6 +55,14 @@ task_generation_service = TaskGenerationService()
 
 
 async def _sync_task_runtime_status(task_id: int, is_running: bool) -> None:
+    if task_id == SELLER_SUBSCRIPTION_JOB_ID:
+        await set_subscription_running(is_running)
+        await websocket.broadcast_message(
+            "seller_subscription_status_changed",
+            {"is_running": is_running},
+        )
+        return
+
     task_service = TaskService(create_task_repository())
     task = await task_service.get_task(task_id)
     if not task or task.is_running == is_running:
@@ -66,7 +88,9 @@ set_task_generation_service(task_generation_service)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
-    # 启动时
+    # 启动时：debugpy 下 stdout 会被 detach，重新绑定 uvicorn 日志到 stderr
+    logging.config.dictConfig(UVICORN_LOG_CONFIG)
+    configure_app_logging()
     print("正在启动应用...")
     bootstrap_storage()
     cleanup_task_logs(keep_days=app_settings.task_log_retention_days)
@@ -80,7 +104,13 @@ async def lifespan(app: FastAPI):
         if task.is_running:
             await task_service.update_task_status(task.id, False)
 
-    # 加载定时任务
+    migrated = await migrate_legacy_subscription_tasks()
+    if migrated:
+        print(f"已从旧版订阅任务迁移 {migrated} 个卖家")
+
+    await set_subscription_running(False)
+    schedule = await get_schedule()
+    await scheduler_service.reload_seller_subscription_job(schedule)
     await scheduler_service.reload_jobs(tasks_list)
     scheduler_service.start()
 
@@ -103,6 +133,25 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+
+def _log_api_error(message: str) -> None:
+    """debugpy 下 logging.StreamHandler 可能失败，直接写 stderr 更稳。"""
+    try:
+        sys.stderr.write(message + "\n")
+        sys.stderr.flush()
+    except Exception:
+        pass
+
+
+@app.exception_handler(HTTPException)
+async def log_http_exception(request: Request, exc: HTTPException):
+    """在终端一行输出 API 业务错误（404 等），不打印整段 traceback。"""
+    if exc.status_code >= 400:
+        _log_api_error(
+            f"WARNING app: {request.method} {request.url.path} -> {exc.status_code}: {exc.detail}"
+        )
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
 # 注册路由
 app.include_router(tasks.router)
 app.include_router(dashboard.router)
@@ -114,6 +163,8 @@ app.include_router(collections.router)
 app.include_router(login_state.router)
 app.include_router(websocket.router)
 app.include_router(accounts.router)
+app.include_router(seller_subscriptions.router)
+app.include_router(shop_analytics.router)
 
 # 挂载静态文件
 # 旧的静态文件目录（用于截图等）
@@ -134,7 +185,6 @@ async def health_check():
 
 
 # 认证状态检查端点
-from fastapi import Request, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -152,8 +202,6 @@ async def auth_status(payload: LoginRequest):
 
 
 # 主页路由 - 服务 Vue 3 SPA
-from fastapi.responses import JSONResponse
-
 @app.get("/")
 async def read_root(request: Request):
     """提供 Vue 3 SPA 的主页面"""
@@ -173,6 +221,10 @@ async def serve_spa(request: Request, full_path: str):
     Catch-all 路由，将所有非 API 请求重定向到 index.html
     这样可以支持 Vue Router 的 HTML5 History 模式
     """
+    # 未匹配的 /api/* 必须返回 JSON，避免前端/curl 误拿到 index.html
+    if full_path == "api" or full_path.startswith("api/"):
+        raise HTTPException(status_code=404, detail=f"API 路由未找到: /{full_path}")
+
     # 如果请求的是静态资源（如 favicon.ico），返回 404
     if full_path.endswith(('.ico', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.css', '.js', '.json')):
         return JSONResponse(status_code=404, content={"error": "资源未找到"})
@@ -192,4 +244,9 @@ if __name__ == "__main__":
     from src.infrastructure.config.settings import settings
 
     print(f"启动新架构应用，端口: {app_settings.server_port}")
-    uvicorn.run(app, host="0.0.0.0", port=app_settings.server_port)
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=app_settings.server_port,
+        log_config=UVICORN_LOG_CONFIG,
+    )

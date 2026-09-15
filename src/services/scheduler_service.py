@@ -7,7 +7,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from typing import List
 
 from src.core.cron_utils import build_cron_trigger
-from src.domain.models.task import Task
+from src.domain.models.task import TASK_TYPE_SELLER_SUBSCRIPTION, Task
 from src.services.process_service import ProcessService
 
 
@@ -55,6 +55,8 @@ class SchedulerService:
         self.scheduler.remove_all_jobs()
 
         for task in tasks:
+            if task.task_type == TASK_TYPE_SELLER_SUBSCRIPTION:
+                continue
             if task.enabled and task.cron:
                 try:
                     trigger = build_cron_trigger(
@@ -75,7 +77,35 @@ class SchedulerService:
 
         print("定时任务加载完成")
 
+    async def reload_seller_subscription_job(self, schedule: dict):
+        """加载卖家订阅独立定时任务。"""
+        job_id = "seller_subscriptions"
+        existing = self.scheduler.get_job(job_id)
+        if existing is not None:
+            self.scheduler.remove_job(job_id)
+
+        if schedule.get("enabled") and schedule.get("cron"):
+            try:
+                trigger = build_cron_trigger(
+                    schedule["cron"],
+                    timezone=self.scheduler.timezone,
+                )
+                self.scheduler.add_job(
+                    self._run_seller_subscriptions,
+                    trigger=trigger,
+                    id=job_id,
+                    name="Scheduled: seller subscriptions",
+                    replace_existing=True,
+                )
+                print(f"  -> 已为卖家订阅添加定时规则: '{schedule['cron']}'")
+            except ValueError as exc:
+                print(f"  -> [警告] 卖家订阅 Cron 无效: {exc}")
+
     async def _run_task(self, task_id: int, task_name: str):
         """执行定时任务"""
         print(f"定时任务触发: 正在为任务 '{task_name}' 启动爬虫...")
         await self.process_service.start_task(task_id, task_name)
+
+    async def _run_seller_subscriptions(self):
+        print("定时任务触发: 正在启动卖家订阅采集...")
+        await self.process_service.start_seller_subscription_job()

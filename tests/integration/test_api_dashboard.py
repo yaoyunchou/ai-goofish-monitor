@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -21,6 +22,51 @@ def test_dashboard_summary_aggregates_tasks_and_results(tmp_path, monkeypatch):
 
     jsonl_dir = tmp_path / "jsonl"
     jsonl_dir.mkdir(parents=True, exist_ok=True)
+
+    async def fake_list_result_filenames():
+        return [path.name for path in Path("jsonl").glob("*.jsonl")]
+
+    async def fake_list_latest_by_cycle(*_args, **_kwargs):
+        return []
+
+    async def fake_load_result_summary(filename: str):
+        path = Path("jsonl") / filename
+        if not path.exists():
+            return None
+        records = []
+        with open(path, "r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if line:
+                    records.append(json.loads(line))
+        if not records:
+            return None
+        recommended = [
+            record
+            for record in records
+            if (record.get("ai_analysis") or {}).get("is_recommended") is True
+        ]
+        ai_recommended = [
+            record for record in recommended if (record.get("ai_analysis") or {}).get("analysis_source") == "ai"
+        ]
+        keyword_recommended = [
+            record
+            for record in recommended
+            if (record.get("ai_analysis") or {}).get("analysis_source") == "keyword"
+        ]
+        return {
+            "total_items": len(records),
+            "recommended_items": len(recommended),
+            "ai_recommended_items": len(ai_recommended),
+            "keyword_recommended_items": len(keyword_recommended),
+            "latest_crawl_time": records[0].get("爬取时间"),
+            "latest_record": records[0],
+            "latest_recommendation": recommended[0] if recommended else None,
+        }
+
+    monkeypatch.setattr("src.services.dashboard_service.list_result_filenames", fake_list_result_filenames)
+    monkeypatch.setattr("src.services.dashboard_service.list_latest_by_cycle", fake_list_latest_by_cycle)
+    monkeypatch.setattr("src.services.dashboard_payloads.load_result_summary", fake_load_result_summary)
 
     repository = InMemoryTaskRepository()
     task_service = TaskService(repository)

@@ -41,6 +41,18 @@ const routes = [
         meta: { titleKey: 'routes.results', requiresAuth: true },
       },
       {
+        path: 'seller-subscriptions',
+        name: 'SellerSubscriptions',
+        component: () => import('@/views/SellerSubscriptionView.vue'),
+        meta: { titleKey: 'routes.sellerSubscriptions', requiresAuth: true },
+      },
+      {
+        path: 'shop-analytics',
+        name: 'ShopAnalytics',
+        component: () => import('@/views/ShopAnalyticsView.vue'),
+        meta: { titleKey: 'routes.shopAnalytics', requiresAuth: true },
+      },
+      {
         path: 'results/collected/:id',
         name: 'CollectionDetail',
         component: () => import('@/views/CollectionDetailView.vue'),

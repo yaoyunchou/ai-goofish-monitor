@@ -1,0 +1,279 @@
+{
+  "capturedAt": "2026-09-15T03:29:47.297Z",
+  "pageUrl": "https://www.goofish.com/",
+  "page": {
+    "pageUrl": "https://www.goofish.com/",
+    "referrer": "https://www.goofish.com/",
+    "visibilityState": "visible"
+  },
+  "env": {
+    "navigator": {
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+      "platform": "Win32",
+      "language": "zh-CN",
+      "languages": [
+        "zh-CN",
+        "en-US",
+        "en",
+        "zh"
+      ],
+      "hardwareConcurrency": 20,
+      "deviceMemory": 32,
+      "maxTouchPoints": 0,
+      "webdriver": false,
+      "doNotTrack": null,
+      "userAgentData": {
+        "brands": [
+          {
+            "brand": "Google Chrome",
+            "version": "153"
+          },
+          {
+            "brand": "Not_A Brand",
+            "version": "8"
+          },
+          {
+            "brand": "Chromium",
+            "version": "153"
+          }
+        ],
+        "mobile": false,
+        "platform": "Windows"
+      }
+    },
+    "screen": {
+      "width": 1920,
+      "height": 1200,
+      "devicePixelRatio": 1,
+      "colorDepth": 24
+    },
+    "intl": {
+      "timeZone": "Asia/Shanghai",
+      "locale": "zh-CN"
+    }
+  },
+  "storage": {
+    "local": {
+      "APLUS_CNA": "20260915_QSJzH2EuJwUCATo9oQUV6%2B6p",
+      "APLUS_LS_KEY": "[\"APLUS_S_CORE_1.0.22_20260728193427_40d118d0\"]",
+      "ARGUS_XSS_V3": "{\"$20xN*Rt%j$P$3hs%0Z*Mldr-z$N$mx0%m5aWldFcH$aRmhO%FE9PQ___1.24.2.7608\":{\"time\":1789442903359}}",
+      "CONV_REDPOINT_STORAGE_874979280": "{\"43477047@goofish\":1}",
+      "ETLCD": "false",
+      "PC_SITE_browseDetailTotal": "0",
+      "PC_SITE_paymentInfoList": "[]",
+      "PC_SITE_searchHistory": "[\"30w充电头多口\",\"狮子老爸讲故事\"]",
+      "PC_SITE_searchTotalTimes": "0",
+      "PC_SITE_survey_first_views_time": "2026-09-15 11:28:23",
+      "PC_SITE_survey_page_views": "3",
+      "_3dtid": "OkKpyTfSQzlyU+pAFws1UU47abgo+7l2YtdKQZ/nevj0EKLxVmHWoNprWf9t2Epi",
+      "__tea_cache_first_586864": "1",
+      "__tea_cache_tokens_586864": "{\"web_id\":\"7602221719785047595\",\"user_unique_id\":\"629839397703694971\",\"timestamp\":1789442942288,\"_type_\":\"default\"}",
+      "__tea_sdk_ab_version_586864": "{\"data\":{\"ai_space_coding_tab_enable\":{\"val\":true,\"vid\":\"91057181\"},\"ai_space_enable_file_preview\":{\"val\":true,\"vid\":\"91199715\"},\"ai_space_media_askdoubao_enable\":{\"val\":true,\"vid\":\"91007794\"},\"ai_space_use_new_download\":{\"val\":true,\"vid\":\"90982815\"},\"ai_space_use_new_file_preview\":{\"val\":true,\"vid\":\"91231835\"},\"always_show_writing_upload_btn\":{\"val\":true,\"vid\":\"90938185\"},\"artifact_share_resource_types\":{\"val\":[2,4],\"vid\":\"90968384\"},\"chat_list_type\":{\"val\":1,\"vid\":\"90114498\"},\"coding_enable_java_run\":{\"val\":true,\"vid\":\"13493097\"},\"coding_enable_js_go_run\":{\"val\":true,\"vid\":\"13730966\"},\"create_bot_auto_fill_web\":{\"val\":true,\"vid\":\"90117286\"},\"disable_pdf_translate_service\":{\"val\":{\"value\":\"1\"},\"vid\":\"92491570\"},\"enableDefaultDoubaoPDFTranslate\":{\"val\":true,\"vid\":\"91069653\"},\"enableDefaultDoubaoPageTranslate\":{\"val\":true,\"vid\":\"91051213\"},\"enableDetectLangWithHuoShan\":{\"val\":true,\"vid\":\"91020049\"},\"enableHighlightTag\":{\"val\":true,\"vid\":\"9906316\"},\"enableImageAskDoubao\":{\"val\":true,\"vid\":\"90924124\"},\"enableNewVideoCardV1\":{\"val\":\"2\",\"vid\":\"91029540\"},\"enable_ai_read_new_guidance\":{\"val\":true,\"vid\":\"90968141\"},\"enable_asr\":{\"val\":true,\"vid\":\"90127854\"},\"enable_mindmap_preset_prompt\":{\"val\":true,\"vid\":\"90126811\"},\"enable_product_page\":{\"val\":true,\"vid\":\"90626468\"},\"enable_read_canvas\":{\"val\":true,\"vid\":\"90350805\"},\"enable_samantha_protocol_skill_id_8000\":{\"val\":1,\"vid\":\"90950265\"},\"enable_smart_podcast_use_new_model\":{\"val\":true,\"vid\":\"91058352\"},\"enable_tts\":{\"val\":true,\"vid\":\"90168264\"},\"ext_enable_deep_think\":{\"val\":true,\"vid\":\"91009369\"},\"flow_account_show_feishu_features\":{\"val\":false,\"vid\":\"91371384\"},\"image_guidance_page_chat_input_position\":{\"val\":\"center\",\"vid\":\"90962683\"},\"isNovaMode\":{\"val\":true,\"vid\":\"90994230\"},\"isNovaPart2Enable\":{\"val\":true,\"vid\":\"90992987\"},\"isNovaVideoEnable\":{\"val\":true,\"vid\":\"90993669\"},\"landing_to_new_chat\":{\"val\":false,\"vid\":\"90114864\"},\"message_action_share_position\":{\"val\":\"end\",\"vid\":\"90616154\"},\"mindmap_skill_use_main_chat\":{\"val\":true,\"vid\":\"91234107\"},\"new_user_guide_enable_lottery_1\":{\"val\":true,\"vid\":\"90358511\"},\"pdf_guidance_mf\":{\"val\":true,\"vid\":\"90331482\"},\"searchCardSummaryV2\":{\"val\":true,\"vid\":\"90916277\"},\"show_create_doc_by_message_action_button\":{\"val\":true,\"vid\":\"90968623\"},\"show_editorTools_in_header\":{\"val\":true,\"vid\":\"91003684\"},\"show_in_update_page\":{\"val\":true,\"vid\":\"91000495\"},\"show_large_onboarding_avatar\":{\"val\":true,\"vid\":\"90114863\"},\"show_pwa_guide\":{\"val\":true,\"vid\":\"90114503\"},\"show_writing_online_btn\":{\"val\":true,\"vid\":\"90609211\"},\"support_auto_continue_write\":{\"val\":\"false\",\"vid\":\"91044245\"},\"upload_optimization\":{\"val\":true,\"vid\":\"90970898\"}},\"uuid\":\"629839397703694971\",\"timestamp\":1789442942469,\"ab_version_multilink\":[],\"ab_ext_version\":[],\"ab_version\":[\"9906316\",\"90924124\",\"91234107\",\"92491570\"]}",
+      "_lib_auto_login_havana_storage_arms_api_key_": "eian9u_autoLogin_667609368c6",
+      "auyst": "1770030189",
+      "baxia_entry_config": "cQlm93344aNjZFZz3IKaQRt0uYC8z+Gy1vBsf1r5GmLeME5P22Bnc7QlqH9Znl5g",
+      "baxia_entry_config_time": "8EZb4dXBjJnr6Wnh9ovGHA==",
+      "dx-isSupportWebp": "true",
+      "fycf": "1migZuBtKgSVUDIuNuMhoSTMIqetYk8qX4+nF5arIL4heAbGD0179vsU5JkFOOu6/4iuPX+V2Sw20H/r3cDRuuFpzqLGyP8rq8hSKRypn761pyEP12vzXi2JiTa8DsxMQmOAkyCzo6uelh3FsIBOdlsAVOazrxbgnQyIKVFAMst83uVLTOVwSDnDF1P+svIfHAlSU5eU407sAEP5bslcWMbUiEJNQcHV4/CUStY+mlEi4Cw/iHBo0u6j6gnS6hvWf9UToM1k2W7glQ0eIcgDgChkzmxjZeTFBTFuzeCi5KVbxkRd0SWlSqz16Dab3u3nIIwfesH1QTFhWSm3rAsE98ZFtodPd/SY9/zGwJH2x6pt9pgy04u0MCR3RqMFUBwJ4l1D3ngrFjb30TTH3wpYkcjnHRTQWJWR6fG+Rxhq1Y/H0YNXtpOL1gJlvm2VT4ojf7ISHF/dJEQ3PpcCk+zkZXvKP2HR2GSn9JuVvJDdHld7P3kv0UOf3mBWUOnUcI39mdm9J1ps8NZfGtMM8ZLC9fG792Q+XZcns5G9ZxVJyY8VH9ZXRrtW7dUUxescp9a3OKq2PE1YjyQxLR6dtydJGFNoly2foCnobzIax60AY6vwnav4nYitlktIMKh/0XU8M3pctXquwejgIrke6OlCBZbzv7uAkS1u4AcL0/VvqDodD0JY18+n1Pjof6HtVAG9TLC4macwngDFeHd59FmHs+p3zISvJh7xNOOcXM2oLVtSVO6pGTfNYVvT5vNXGNP5ftav2jbx5efHNoEpH5tKLlNz+xuCmwGtGvlSFUJbMrntzWAhAoh5OHRgbJhCUe4m6DX/ZsD/f+ir49aPBiYRyECaMc3Mz11M+J3Yvk6oxTbVsqFkScmZZmF9Nze1El+PSTAVztrFKag+N5bdYcR8Ebi2BaHD2MdcdiciiV/eZ4QZ2MmBVSYZ1xJVJ/SG3b3pw6RTcXMls2wurhow0qbwpXiGr5sgGJ3HBtxKJABxlwCyPaEyrEKXiFout+8yRL3Y1jOwdzKDve/0m6Dn6jl7DIelpiMOTIbeyQXXr0mnf+uKQNxOPRp1m7f7PcRqTtpSOJaVVOoMRJ//M2d+/iL+whwWm8Hb5mvNTmWBPjNAHYiovLLvM5S2s058gmmaYcSA20zAx1wcg2cWR1+iJLJz0jyZSg7wIdoLxgIot7Jo3jfi3jG2iyEsdJRwGhJRDd1L6tgO0VYcWtJsSXgEBJeRBWh2KbhKVVg6EF+MnPm+7/EdDo6tg9BowWkmABYAA63y",
+      "lswucn": "T2gAJjD6PHPzJlK-i_hF2xU-m-KvJd9iIxQDt4uIphE2VATB9NH5e2B3VoBJd2kr2Jg=@@1789442904",
+      "syfhs": "2899298028",
+      "tfstk__": "gGboQggIGg-7YjD4Sv87dJahJ1qAFUTB493ppepU0KJjeY3RTvXh3OC-ywCeK9Xvh9xQNppeK9CF2SUTW_1WReu3BPUOGN6xeTcyYHPeuBdQMQJztl0yReyTHm3eVPYCeOzVnH54iBdKaYWE8mJ2hBmEa9Jy0xRM1eJFL9Jq3COE4pJE4nR2hB8eL98UisJXteJFLePcgbrnzd7FlZruwQ-4d6tPoQxkQsqs82X-W3JNcKuUpZAohd5yn2ueQ7qcrsf8EV1vPNBM6TUqrOfF1M-c-xyMdZfVzM5jEJRfYTL2eFrriUQ5aG-F7JiFIUXHba-mTWfRaLYDgNPKfKQDe97k053MvE79bUSYc8KprCXFPTcn8O5A6atf-RD2dgd6uBbQ_DvHYgom0ckEu2O49ZoIA3RXiddhFb1__XlSySVmbRtyGIybiSmIA3RXidF0icy64IO4h",
+      "tpl$TplNameList": "{\"t\":\"string\",\"v\":\"red_flower_lottery_card$idlefish_message_delivery_certificate\"}",
+      "tpl-red_flower_lottery_card": "{\"t\":\"object\",\"v\":\"{\\\"name\\\":\\\"red_flower_lottery_card\\\",\\\"content\\\":{\\\"template\\\":[{\\\"children\\\":[{\\\"name\\\":\\\"LinearLayout\\\",\\\"attrs\\\":{\\\"backgroundColor\\\":\\\"@data{item.main.exContent.backgroundColor}\\\",\\\"width\\\":\\\"match_parent\\\",\\\"height\\\":\\\"match_parent\\\"}},{\\\"name\\\":\\\"ImageView\\\",\\\"attrs\\\":{\\\"imageUrl\\\":\\\"@data{item.main.exContent.backgroundImg}\\\",\\\"width\\\":\\\"match_parent\\\",\\\"height\\\":\\\"match_parent\\\"}},{\\\"children\\\":[{\\\"children\\\":[{\\\"name\\\":\\\"TextView\\\",\\\"attrs\\\":{\\\"textSize\\\":\\\"16\\\",\\\"gravity\\\":\\\"leftCenter\\\",\\\"maxLines\\\":\\\"2\\\",\\\"text\\\":\\\"@data{item.main.exContent.title}\\\",\\\"textColor\\\":\\\"#1F1F1F\\\",\\\"isBold\\\":\\\"true\\\"}},{\\\"name\\\":\\\"TextView\\\",\\\"attrs\\\":{\\\"textSize\\\":\\\"14\\\",\\\"gravity\\\":\\\"leftCenter\\\",\\\"maxLines\\\":\\\"2\\\",\\\"text\\\":\\\"@data{item.main.exContent.subTitle}\\\",\\\"textColor\\\":\\\"#801F1F1F\\\",\\\"isBold\\\":\\\"false\\\",\\\"marginTop\\\":\\\"2\\\"}}],\\\"name\\\":\\\"LinearLayout\\\",\\\"attrs\\\":{\\\"orientation\\\":\\\"vertical\\\",\\\"gravity\\\":\\\"leftCenter\\\",\\\"paddingRight\\\":\\\"16\\\",\\\"width\\\":\\\"match_content\\\",\\\"weight\\\":\\\"1\\\",\\\"height\\\":\\\"match_content\\\"}},{\\\"children\\\":[{\\\"children\\\":[{\\\"name\\\":\\\"ImageView\\\",\\\"attrs\\\":{\\\"marginRight\\\":\\\"@triple{@data{item.main.exContent.button.text}, 4, 0}\\\",\\\"visibility\\\":\\\"@triple{@data{item.main.exContent.button.leftImg}, 'visible', 'gone'}\\\",\\\"imageUrl\\\":\\\"@data{item.main.exContent.button.leftImg}\\\",\\\"width\\\":\\\"16\\\",\\\"height\\\":\\\"16\\\"}},{\\\"name\\\":\\\"TextView\\\",\\\"attrs\\\":{\\\"textSize\\\":\\\"12\\\",\\\"gravity\\\":\\\"center\\\",\\\"text\\\":\\\"@data{item.main.exContent.button.text}\\\",\\\"textColor\\\":\\\"@triple{@data{item.main.exContent.button.fontColor}, @data{item.main.exContent.button.fontColor}, '#333333'}\\\",\\\"isBold\\\":\\\"true\\\"}}],\\\"name\\\":\\\"LinearLayout\\\",\\\"attrs\\\":{\\\"backgroundColor\\\":\\\"@triple{@data{item.main.exContent.button.bgColor}, @data{item.main.exContent.button.bgColor}, '#FF3131'}\\\",\\\"borderColor\\\":\\\"@triple{@data{item.main.exContent.button.borderColor}, @data{item.main.exContent.button.borderColor}, '#00000000'}\\\",\\\"orientation\\\":\\\"horizontal\\\",\\\"paddingRight\\\":\\\"12\\\",\\\"onTap\\\":\\\"@fishTap{@data{item.main.exContent.button}}\\\",\\\"cornerRadius\\\":\\\"100\\\",\\\"childGravity\\\":\\\"center\\\",\\\"paddingBottom\\\":\\\"8\\\",\\\"borderWidth\\\":\\\"0.5\\\",\\\"gravity\\\":\\\"rightCenter\\\",\\\"width\\\":\\\"match_content\\\",\\\"paddingTop\\\":\\\"8\\\",\\\"paddingLeft\\\":\\\"12\\\",\\\"height\\\":\\\"match_content\\\"}}],\\\"name\\\":\\\"FrameLayout\\\",\\\"attrs\\\":{\\\"visibility\\\":\\\"@triple{@data{item.main.exContent.button.text}, 'visible', 'gone'}\\\",\\\"gravity\\\":\\\"rightCenter\\\",\\\"width\\\":\\\"match_content\\\",\\\"height\\\":\\\"match_content\\\"}}],\\\"name\\\":\\\"LinearLayout\\\",\\\"attrs\\\":{\\\"childGravity\\\":\\\"center\\\",\\\"orientation\\\":\\\"horizontal\\\",\\\"paddingBottom\\\":\\\"12\\\",\\\"gravity\\\":\\\"center\\\",\\\"paddingRight\\\":\\\"12\\\",\\\"width\\\":\\\"match_parent\\\",\\\"paddingTop\\\":\\\"12\\\",\\\"paddingLeft\\\":\\\"12\\\",\\\"height\\\":\\\"match_content\\\"}}],\\\"name\\\":\\\"FrameLayout\\\",\\\"attrs\\\":{\\\"marginRight\\\":\\\"12\\\",\\\"width\\\":\\\"match_parent\\\",\\\"marginBottom\\\":\\\"12\\\",\\\"marginTop\\\":\\\"20\\\",\\\"height\\\":\\\"match_content\\\",\\\"cornerRadius\\\":\\\"12\\\",\\\"backgroundGradient\\\":\\\"@linearGradient{'toBottom', '#FFEAE5', '#FFF5F2'}\\\",\\\"marginLeft\\\":\\\"12\\\"}}],\\\"bizCode\\\":\\\"biz_red_flower_lottery_card\\\",\\\"bindingXJson\\\":{},\\\"version\\\":\\\"3.5.0\\\"},\\\"version\\\":\\\"1732262726268\\\"}\"}"
+    },
+    "session": {
+      "__accs_device": "1582671790_985",
+      "__tea_session_id_586864": "{\"sessionId\":\"1f9c3a45-0f66-409f-b8ad-880af0451d1e\",\"timestamp\":1789442954839}"
+    }
+  },
+  "meta": {
+    "droppedStorageKeys": {
+      "local": [
+        "APLUS_S_CORE_1.0.22_20260728193427_40d118d0",
+        "PC_SITE_idlefish_im_emoji_data",
+        "tpl-idlefish_message_delivery_certificate"
+      ],
+      "session": []
+    }
+  },
+  "headers": {
+    "sec-ch-ua-platform": "\"Windows\"",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+    "sec-ch-ua": "\"Google Chrome\";v=\"153\", \"Not_A Brand\";v=\"8\", \"Chromium\";v=\"153\"",
+    "sec-ch-ua-mobile": "?0",
+    "Accept": "*/*",
+    "Sec-Fetch-Site": "same-origin",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Dest": "empty",
+    "Referer": "https://www.goofish.com/",
+    "Accept-Encoding": "gzip, deflate, br, zstd",
+    "Accept-Language": "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7"
+  },
+  "cookies": [
+    {
+      "name": "t",
+      "value": "612c021eea9027a4069f94aaa515ccb4",
+      "domain": ".goofish.com",
+      "path": "/",
+      "expires": 1797247707.473946,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "cna",
+      "value": "QSJzH2EuJwUCATo9oQUV6+6p",
+      "domain": ".goofish.com",
+      "path": "/",
+      "expires": 1819779197.039615,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "tracknick",
+      "value": "%E8%93%9D%E5%B0%8F%E9%A3%9E%E9%B1%BC",
+      "domain": ".goofish.com",
+      "path": "/",
+      "expires": 1821007728.033868,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "xlly_s",
+      "value": "1",
+      "domain": ".goofish.com",
+      "path": "/",
+      "expires": 1789702103,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "cookie2",
+      "value": "17af36cf50818b28aaaadf37b8355ecb",
+      "domain": ".goofish.com",
+      "path": "/",
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_m_h5_tk",
+      "value": "b6aa45643e2e4f25c7493dce00ba3afe_1789453344309",
+      "domain": ".goofish.com",
+      "path": "/",
+      "expires": 1789448304.268939,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_m_h5_tk_enc",
+      "value": "19e5a1202d865ea27e39da6061b810aa",
+      "domain": ".goofish.com",
+      "path": "/",
+      "expires": 1789448304.268959,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_samesite_flag_",
+      "value": "true",
+      "domain": ".goofish.com",
+      "path": "/",
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_tb_token_",
+      "value": "e58eb637e19e3",
+      "domain": ".goofish.com",
+      "path": "/",
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "sgcookie",
+      "value": "E100H%2FeZGbOI0einJeJDxmZQW40gZxXAnbuRbRA7GJMRWzIFFbEYJGvwoax35nHS8JJ2wDeUySZ%2FgdbcvuwX%2FK9st7E7Ovh5jeYYVNsXDwejynvoReNsoox6x4YFeQB%2FRelM",
+      "domain": ".goofish.com",
+      "path": "/",
+      "expires": 1821007728.033766,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "csg",
+      "value": "76d79f30",
+      "domain": ".goofish.com",
+      "path": "/",
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "unb",
+      "value": "874979280",
+      "domain": ".goofish.com",
+      "path": "/",
+      "expires": 1789730928.033949,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "havana_lgc2_77",
+      "value": "eyJoaWQiOjg3NDk3OTI4MCwic2ciOiI5ZWFlNzBhNTE2N2JjNzA5NWZhN2YyNjdlZjliYjcyYyIsInNpdGUiOjc3LCJ0b2tlbiI6IjFPSlN0aW12Qk5qUkZPb3FISUFTTFpBIn0",
+      "domain": ".goofish.com",
+      "path": "/",
+      "expires": 1792063728.033977,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_hvn_lgc_",
+      "value": "77",
+      "domain": ".goofish.com",
+      "path": "/",
+      "expires": 1792063728.034005,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "havana_lgc_exp",
+      "value": "1792034928077",
+      "domain": ".goofish.com",
+      "path": "/",
+      "expires": 1792063728.034033,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "sdkSilent",
+      "value": "1789529331920",
+      "domain": ".goofish.com",
+      "path": "/",
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "tfstk",
+      "value": "gjYiQgabOhSs0W2Er-7shxgDkQmpCN_fbKUAHZBqY9WQBRU9g-vDLLdTWEdVnKvddKjj1tBVnKd2XX3-yCO1lZzme43JOU9LBdVN0ilV8sCj91WZi04NlZk-pkUVf4bXBLueKiREtsCY_-J4uk5Fdsq4_KWNYJ5lNZW23KWUL_14btW4bM5Fds7V3K7qtBWCiZW23ZlHTbl37T82Reoi61SEhOLD-1jGUBm7urvTyGWy_94qHefgCTRNKrzVUfmHSBAtIzOd5Uplwd3USLA2NnSHoJklheAe7nRQIx5B0dQFBaoatNL6_3S2zxZ2ENvc4FS3gjA9_ObhTUlYV9LhBK8GYbUlDw8R4N-KAAIAS_v25dV0uLRpwFsBoY2FhhC58sYjaoXc0gl0Yuy48r1EMerbcG5CtTCDC5OSaSP_WXc34YsNO6kItXqbcG5CtThntuk5b61Ed",
+      "domain": ".goofish.com",
+      "path": "/",
+      "expires": 1804994942,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    }
+  ]
+}

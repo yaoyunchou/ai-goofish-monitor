@@ -118,6 +118,8 @@ export function useDashboard() {
 
   fetchSummary()
 
+  const shopOverview = computed(() => snapshot.value?.shop_overview || null)
+
   return {
     snapshot,
     focusInsights,
@@ -125,6 +127,7 @@ export function useDashboard() {
     taskSummaries,
     activities,
     focusTask,
+    shopOverview,
     suggestion,
     isLoading,
     error,

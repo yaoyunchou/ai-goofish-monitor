@@ -44,6 +44,7 @@ const criteriaTask = ref<Task | null>(null)
 const criteriaDescription = ref('')
 const isCriteriaSubmitting = ref(false)
 const isDeleteDialogOpen = ref(false)
+const isDeleteSubmitting = ref(false)
 const taskToDeleteId = ref<number | null>(null)
 const accountOptions = ref<AccountItem[]>([])
 
@@ -59,14 +60,18 @@ function handleDeleteTask(taskId: number) {
 }
 
 async function handleConfirmDeleteTask() {
+  if (isDeleteSubmitting.value) return
   if (!taskToDelete.value) {
     toast({ title: t('tasks.toasts.notFound'), variant: 'destructive' })
     isDeleteDialogOpen.value = false
     return
   }
+  isDeleteSubmitting.value = true
   try {
     await removeTask(taskToDelete.value.id)
     toast({ title: t('tasks.toasts.deleted') })
+    isDeleteDialogOpen.value = false
+    taskToDeleteId.value = null
   } catch (e) {
     toast({
       title: t('tasks.toasts.deleteFailed'),
@@ -74,8 +79,7 @@ async function handleConfirmDeleteTask() {
       variant: 'destructive',
     })
   } finally {
-    isDeleteDialogOpen.value = false
-    taskToDeleteId.value = null
+    isDeleteSubmitting.value = false
   }
 }
 
@@ -288,7 +292,9 @@ onMounted(fetchAccountOptions)
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" @click="isDeleteDialogOpen = false">{{ t('common.cancel') }}</Button>
-          <Button variant="destructive" @click="handleConfirmDeleteTask">{{ t('tasks.deleteDialog.confirm') }}</Button>
+          <Button variant="destructive" :disabled="isDeleteSubmitting" @click="handleConfirmDeleteTask">
+            {{ isDeleteSubmitting ? t('common.loading') : t('tasks.deleteDialog.confirm') }}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

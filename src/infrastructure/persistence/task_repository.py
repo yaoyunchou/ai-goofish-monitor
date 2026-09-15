@@ -25,6 +25,16 @@ def _row_to_task(row) -> Task:
         payload.pop("keyword_rules_json"),
         default=[],
     )
+    payload["seller_user_ids"] = parse_json_field(
+        payload.pop("seller_user_ids_json", "[]"),
+        default=[],
+    )
+    payload["seller_urls"] = parse_json_field(
+        payload.pop("seller_urls_json", "[]"),
+        default=[],
+    )
+    payload["collect_ratings"] = bool(payload.get("collect_ratings", False))
+    payload["task_type"] = payload.get("task_type") or "keyword_search"
     return Task(**payload)
 
 
@@ -113,5 +123,11 @@ class TaskDbRepository(TaskRepository):
         values["free_shipping"] = as_sql_bool(task.free_shipping)
         values["is_running"] = as_sql_bool(task.is_running)
         values["keyword_rules_json"] = json.dumps(task.keyword_rules or [], ensure_ascii=False)
+        values["seller_user_ids_json"] = json.dumps(task.seller_user_ids or [], ensure_ascii=False)
+        values["seller_urls_json"] = json.dumps(task.seller_urls or [], ensure_ascii=False)
+        values["collect_ratings"] = as_sql_bool(task.collect_ratings)
+        values["task_type"] = task.task_type or "keyword_search"
         values.pop("keyword_rules", None)
+        values.pop("seller_user_ids", None)
+        values.pop("seller_urls", None)
         return values

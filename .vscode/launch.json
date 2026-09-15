@@ -1,27 +1,10 @@
 {
-    // 后端调试：F5 启动 FastAPI；前端请自行在 web-ui 目录执行 npm run dev
+    // 后端调试：F5 启动；前端请在 web-ui 自行 `npm run dev`
+    // 注意：勿使用 uvicorn --reload 调试，Windows 下无法再 spawn 爬虫子进程（任务启动 500）
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Backend: FastAPI (debug)",
-            "type": "debugpy",
-            "request": "launch",
-            "module": "uvicorn",
-            "args": [
-                "src.app:app",
-                "--host",
-                "0.0.0.0",
-                "--port",
-                "8000"
-            ],
-            "cwd": "${workspaceFolder}",
-            "envFile": "${workspaceFolder}/.env",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "jinja": true
-        },
-        {
-            "name": "Backend: FastAPI (reload)",
+            "name": "Backend: FastAPI (推荐)",
             "type": "debugpy",
             "request": "launch",
             "module": "uvicorn",
@@ -31,14 +14,31 @@
                 "0.0.0.0",
                 "--port",
                 "8000",
-                "--reload"
+                "--log-level",
+                "info"
             ],
             "cwd": "${workspaceFolder}",
             "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONUNBUFFERED": "1"
+            },
             "console": "integratedTerminal",
             "justMyCode": false,
-            "jinja": true,
-            "subProcess": true
+            "jinja": true
+        },
+        {
+            "name": "Backend: src.app",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "src.app",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONUNBUFFERED": "1"
+            },
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "jinja": true
         }
     ]
 }

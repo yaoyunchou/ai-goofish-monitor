@@ -2,7 +2,7 @@
 import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { createTaskWithAI } from '@/api/tasks'
+import { createTask, createTaskWithAI } from '@/api/tasks'
 import { useTaskGenerationJob } from '@/composables/useTaskGenerationJob'
 import type { TaskGenerateRequest } from '@/types/task.d.ts'
 import { parseTaskFormDefaults } from '@/lib/taskFormQuery'
@@ -50,7 +50,9 @@ async function handleCreateTask(data: TaskGenerateRequest) {
   isSubmitting.value = true
   clearJob()
   try {
-    const result = await createTaskWithAI(data)
+    const result = (data.task_type && data.task_type !== 'keyword_search')
+      ? await createTask(data)
+      : await createTaskWithAI(data)
     if (result.job) {
       isFormOpen.value = false
       isProgressOpen.value = true

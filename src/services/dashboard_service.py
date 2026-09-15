@@ -17,6 +17,7 @@ from src.services.dashboard_payloads import (
     summarize_result_file,
 )
 from src.services.result_storage_service import list_result_filenames
+from src.services.shop_datacompass_storage import list_latest_by_cycle
 
 MAX_RECENT_ACTIVITIES = 8
 
@@ -52,6 +53,27 @@ async def build_dashboard_snapshot(tasks: list[Task]) -> dict[str, Any]:
 
     summary_list = sorted(task_summaries.values(), key=sort_key_by_latest_time, reverse=True)
     focus_file = next((item["filename"] for item in summary_list if item.get("filename")), None)
+    shop_overview = {}
+    try:
+        shop_rows = await list_latest_by_cycle("1d")
+        metrics = {}
+        for row in shop_rows:
+            parsed = row.get("metrics") or {}
+            if parsed.get("metrics"):
+                metrics.update(parsed["metrics"])
+        shop_overview = {
+            "shop_name": next((row.get("shop_name") for row in shop_rows if row.get("shop_name")), None),
+            "captured_at": next((row.get("captured_at") for row in shop_rows if row.get("captured_at")), None),
+            "showPv": (metrics.get("showPv") or {}).get("value"),
+            "ipv": (metrics.get("ipv") or {}).get("value"),
+            "vstUv": (metrics.get("vstUv") or {}).get("value"),
+            "payOrdCnt": (metrics.get("payOrdCnt") or {}).get("value"),
+        }
+        captured_at = shop_overview.get("captured_at")
+        if captured_at is not None and hasattr(captured_at, "isoformat"):
+            shop_overview["captured_at"] = captured_at.isoformat()
+    except Exception:
+        shop_overview = {}
     return {
         "summary": _build_summary_metrics(tasks, summary_list, latest_updated_at),
         "task_summaries": summary_list,
@@ -61,4 +83,5 @@ async def build_dashboard_snapshot(tasks: list[Task]) -> dict[str, Any]:
             reverse=True,
         )[:MAX_RECENT_ACTIVITIES],
         "focus_file": focus_file,
+        "shop_overview": shop_overview,
     }

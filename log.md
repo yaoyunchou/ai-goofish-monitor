@@ -2,10 +2,89 @@
 
 ## 2026-09-15
 
+### fix(seller-subscription): 主页头部超时不再阻断商品列表 + 采集状态展示
+
+- `scrape_user_profile` 头部 API 失败时继续滚动抓 `item.list`；加强滚动与登录态提示
+- 仅在有商品入库时更新 `last_captured_at`；调度表记录 `last_run_summary` / 入库条数
+- 前端采集后轮询状态，展示上次采集结果横幅
+
+### feat(seller-subscription): 详情采集分批模拟访问策略
+
+- 新增 `seller_subscription_pacing`：详情间隔 4–8s、每 10 条批休 60–120s、切换卖家休 2–5 分钟、每 25 条长暂停
+- 卖家内商品顺序随机打乱；启动时打印预计总耗时
+- 调度表支持 `pacing_json` 覆盖默认节奏（可选）
+
+### fix(seller-subscription): 添加卖家 POST 422
+
+- `sellerSubscriptions.ts` 的 POST/PATCH 请求补上 `Content-Type: application/json`，修复 FastAPI 无法解析 body 导致 422
+
+### feat(seller-subscription): 独立订阅管理，与任务管理解耦
+
+- 新增 `seller_subscriptions` / `seller_subscription_schedule` 表，卖家在「卖家订阅」页直接添加
+- API：`GET/POST/PATCH/DELETE /api/seller-subscriptions`、`PATCH /schedule`、`POST /run`
+- 定时采集走独立调度任务（`spider_v2.py --seller-subscriptions`），不再依赖 `seller_subscription` 任务类型
+- 任务列表 API 与任务表单隐藏卖家订阅类型；启动时自动迁移旧订阅任务中的卖家
+- `SellerSubscriptionView` 重写：订阅卖家表 + 调度配置 + 商品指标表
+
+### fix(tasks): 删除任务幂等 + 防重复提交
+
+- `DELETE /api/tasks/{id}` 任务已不存在时仍返回 200，避免连点确认报 404
+- 删除前 `stop_task(quiet=True)`，不再刷「没有正在运行的进程」
+- 任务删除对话框增加 `isDeleteSubmitting`，防止重复点击
+
+### refactor(subscription): 固定监控每位卖家前 100 条在售商品
+
+- `seller_subscription_scraper` 移除列表侧「想要/浏览量」过滤，改为每位卖家拉取前 100 条在售商品并逐条详情入库
+- `scrape_user_profile` 新增 `max_items`，列表滚动到足够条数即停止，避免全量翻页
+- 默认 cron 改为每天 `0 8 * * *`；任务配置可传 `item_limit` 覆盖默认 100
+- 前端任务表单提示文案同步更新
+
+### feat(subscription): 用户页订阅与卖家工作台数据罗盘
+
+- 新增任务类型 `seller_subscription` / `shop_datacompass`，支持批量粘贴用户主页链接
+- 订阅采集走商品详情 API 补抓想要/浏览量，写入 `seller_item_metrics` 时序表
+- 新增卖家画像/指标表与 datacompass 快照表，Web UI 增加「卖家订阅」「店铺数据」页面
+- 店铺数据直接解析已探索的 `mtop.alibaba.idle.seller.pc.datacompass.*` API（1d/7d/30d）
+- 修复 Postgres 命名参数适配误替换 `'[]'::jsonb`，避免 dashboard / schema 启动 500
+
+### docs(exploration): 闲鱼用户主页与卖家工作台页面探索
+
+- 新增 `scripts/explore_goofish_pages.py`：Playwright 探索脚本，拦截 MTOP API 并输出 DOM/截图快照
+- 新增 `docs/exploration/personal-profile-exploration.md`：C 端用户主页（`userId=2221197154547`）结构、API 字段、与 `scrape_user_profile` 对齐的采集流程
+- 新增 `docs/exploration/seller-workbench-exploration.md`：卖家工作台「数据总览」路由、datacompass 系列 API、近 1 天经营指标样本
+- 探索产物：`docs/exploration/snapshots/exploration_snapshot.json`、`personal_profile.png`、`seller_workbench.png`
+- 更新 `docs/README.md` 索引，补充页面探索文档入口
+
+### fix(dev): /api 请求不再误返回 index.html
+
+- `src/app.py` catch-all 对未匹配的 `/api/*` 返回 JSON 404，避免旧后端或路由缺失时 curl 拿到 HTML
+- `web-ui/vite.config.ts` 代理后端失败时返回 JSON 502（后端未启动），不再回落到 Vite 的 SPA 页面
+
+### test(shop-analytics): 集成测试验证接口始终返回 JSON
+
+- 新增 `tests/integration/test_api_shop_analytics.py`：覆盖 overview / distribution / trend 空数据与有数据、未知路由 404 非 HTML
+- 本地 `pytest tests/integration/test_api_shop_analytics.py --capture=no` 全部通过 → **后端接口正常**
+
+### fix(shop-analytics): 无数据返回 200 JSON，前端不再解析 HTML 报错
+
+- `overview` / `distribution` / `trend` 无快照时返回 `has_data: false` + `empty_message`（200），避免前端 `response.json()` 与业务 404 混淆
+- `web-ui/src/lib/http.ts` 检测 HTML 响应并提示「后端未启动」，修复 `Unexpected token '<'`
+- `ShopAnalyticsView` 根据 `has_data` 展示空状态横幅
+
+### fix(logging): HTTPException 404 不再刷整段 traceback
+
+- `src/app.py` 业务 404 改为一行 stderr 输出，避免 debugpy 下 `logging` emit 失败把正常响应打成崩溃堆栈
+
+### fix(logging): debugpy 下调试日志不再掩盖 API 异常
+
+- 新增 `src/infrastructure/logging_config.py`：uvicorn 日志统一写入 stderr，修复 `underlying buffer has been detached`
+- `src/app.py` 在 lifespan 与应用入口应用该配置，并增加 `HTTPException` 一行式告警日志（如 `POST /api/shop-analytics/collect -> 404: 未找到已启用的店铺数据罗盘任务`）
+
 ### chore(vscode): 后端 FastAPI 调试配置
 
-- 更新 `.vscode/launch.json`：`Backend: FastAPI (debug)` 用于断点调试；`Backend: FastAPI (reload)` 支持热重载（需 `subProcess`）
-- 自动加载 `${workspaceFolder}/.env`，监听 `0.0.0.0:8000`；前端请在 `web-ui` 自行 `npm run dev`
+- 更新 `.vscode/launch.json`：`Backend: FastAPI (推荐)` 无 reload，可正常 spawn 爬虫子进程
+- 新增 `Backend: src.app`（等价 `python -m src.app`，端口读 `.env` 的 `SERVER_PORT`）
+- 移除 `Backend: FastAPI (reload)`：Windows + debugpy 下 reload 会导致任务启动 500 与日志 buffer detached
 
 ## 2026-09-09
 

@@ -83,10 +83,16 @@ class FakeProcessService:
             await self._on_started(task_id)
         return True
 
-    async def stop_task(self, task_id: int):
+    async def stop_task(self, task_id: int, *, quiet: bool = False):
         self.stopped.append(task_id)
         if self._on_stopped:
             await self._on_stopped(task_id)
+
+    def is_seller_subscription_running(self) -> bool:
+        return False
+
+    async def start_seller_subscription_job(self) -> bool:
+        return True
 
     def reindex_after_delete(self, deleted_task_id: int):
         self.reindexed.append(deleted_task_id)
@@ -105,6 +111,9 @@ class FakeSchedulerService:
             for index, task in enumerate(tasks)
             if task.id is not None and task.enabled and task.cron
         }
+
+    async def reload_seller_subscription_job(self, schedule):
+        self.subscription_schedule = schedule
 
     def get_next_run_time(self, task_id: int):
         return self.next_run_times.get(task_id)

@@ -350,7 +350,12 @@ def _build_extra_headers(raw_headers: Optional[dict]) -> dict:
     return headers
 
 
-async def scrape_user_profile(context, user_id: str) -> dict:
+async def scrape_user_profile(
+    context,
+    user_id: str,
+    collect_ratings: bool = True,
+    max_items: int | None = None,
+) -> dict:
     """
     【新版】访问指定用户的个人主页，按顺序采集其摘要信息、完整的商品列表和完整的评价列表。
     """
@@ -383,7 +388,9 @@ async def scrape_user_profile(context, user_id: str) -> dict:
                 data = await response.json()
                 all_items.extend(data.get("data", {}).get("cardList", []))
                 print(f"      [API捕获] 商品列表... 当前已捕获 {len(all_items)} 件")
-                if not data.get("data", {}).get("nextPage", True):
+                if max_items and len(all_items) >= max_items:
+                    stop_item_scrolling.set()
+                elif not data.get("data", {}).get("nextPage", True):
                     stop_item_scrolling.set()
             except Exception as e:
                 stop_item_scrolling.set()
@@ -402,26 +409,52 @@ async def scrape_user_profile(context, user_id: str) -> dict:
     page.on("response", handle_response)
 
     try:
-        # --- 任务1: 导航并采集头部信息 ---
+        # --- 任务1: 导航；头部 API 失败不阻断商品列表 ---
         await page.goto(
             f"https://www.goofish.com/personal?userId={user_id}",
             wait_until="domcontentloaded",
-            timeout=20000,
+            timeout=30000,
         )
-        head_data = await asyncio.wait_for(head_api_future, timeout=15)
-        profile_data = await parse_user_head_data(head_data)
+        profile_data.setdefault("卖家ID", user_id)
+        try:
+            head_data = await asyncio.wait_for(head_api_future, timeout=25)
+            profile_data = await parse_user_head_data(head_data)
+            profile_data.setdefault("卖家ID", user_id)
+        except Exception as head_exc:
+            print(f"      [警告] 用户头部 API 未捕获（{head_exc}），继续采集商品列表…")
 
-        # --- 任务2: 滚动加载所有商品 (默认页面) ---
+        # --- 任务2: 滚动加载商品 (默认「宝贝」Tab) ---
         print("      [采集阶段] 开始采集该用户的商品列表...")
-        await random_sleep(2, 4)  # 等待第一页商品API完成
+        await random_sleep(3, 6)
+        scroll_round = 0
         while not stop_item_scrolling.is_set():
+            scroll_round += 1
             await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             try:
-                await asyncio.wait_for(stop_item_scrolling.wait(), timeout=8)
+                await asyncio.wait_for(stop_item_scrolling.wait(), timeout=10)
             except asyncio.TimeoutError:
-                print("      [滚动超时] 商品列表可能已加载完毕。")
-                break
-        profile_data["卖家发布的商品列表"] = await _parse_user_items_data(all_items)
+                if scroll_round >= 3 and all_items:
+                    print("      [滚动超时] 商品列表可能已加载完毕。")
+                    break
+                if scroll_round >= 5:
+                    print("      [滚动超时] 未再捕获新商品，结束滚动。")
+                    break
+                await random_sleep(1, 2)
+        if not all_items:
+            page_title = await page.title()
+            print(
+                f"      [警告] 商品列表 API 未返回数据（页面标题: {page_title}）。"
+                "请检查登录态 state.json 是否有效。"
+            )
+        item_cards = all_items[:max_items] if max_items else all_items
+        profile_data["卖家发布的商品列表"] = await _parse_user_items_data(item_cards)
+        print(f"      [采集阶段] 商品列表解析完成：原始 {len(all_items)} 条，入库用 {len(item_cards)} 条。")
+        if max_items:
+            print(f"      [采集阶段] 商品列表已限制为前 {max_items} 条。")
+
+        if not collect_ratings:
+            print("      [采集阶段] 已跳过评价采集。")
+            return profile_data
 
         # --- 任务3: 点击并采集所有评价 ---
         print("      [采集阶段] 开始采集该用户的评价列表...")
@@ -452,6 +485,112 @@ async def scrape_user_profile(context, user_id: str) -> dict:
         print(f"   -> 用户 {user_id} 信息采集完成。")
 
     return profile_data
+
+
+async def fetch_item_detail(context, item_link: str) -> dict:
+    """打开商品详情页，拦截 detail API，返回想要/浏览量等字段。"""
+    detail_page = await context.new_page()
+    result: dict = {"ok": False}
+    try:
+        async with detail_page.expect_response(
+            lambda r: DETAIL_API_URL_PATTERN in r.url, timeout=25000
+        ) as detail_info:
+            await detail_page.goto(
+                item_link,
+                wait_until="domcontentloaded",
+                timeout=25000,
+            )
+        detail_response = await detail_info.value
+        if not detail_response.ok:
+            result["status"] = detail_response.status
+            return result
+        detail_json = await detail_response.json()
+        ret_string = str(await safe_get(detail_json, "ret", default=[]))
+        if "FAIL_SYS_USER_VALIDATE" in ret_string:
+            raise RiskControlError("FAIL_SYS_USER_VALIDATE")
+        item_do = await safe_get(detail_json, "data", "itemDO", default={})
+        seller_do = await safe_get(detail_json, "data", "sellerDO", default={})
+        image_infos = await safe_get(item_do, "imageInfos", default=[]) or []
+        image_urls = [img.get("url") for img in image_infos if isinstance(img, dict) and img.get("url")]
+        result.update({
+            "ok": True,
+            "item_do": item_do,
+            "seller_do": seller_do,
+            "“想要”人数": await safe_get(item_do, "wantCnt", default=None),
+            "浏览量": await safe_get(item_do, "browseCnt", default=None),
+            "商品图片列表": image_urls,
+            "商品描述": await safe_get(item_do, "desc", default=""),
+            "卖家ID": await safe_get(seller_do, "sellerId", default=None),
+        })
+        return result
+    finally:
+        await detail_page.close()
+
+
+async def launch_task_browser(task_config: dict):
+    """创建 Playwright browser/context，供订阅/店铺采集复用。返回 (p, browser, context, state_file)。"""
+    rotation_settings = _get_rotation_settings(task_config)
+    account_items = load_state_files(rotation_settings["account_state_dir"])
+    runtime_plan = resolve_account_runtime_plan(
+        strategy=task_config.get("account_strategy"),
+        account_state_file=task_config.get("account_state_file"),
+        has_root_state_file=os.path.exists(STATE_FILE),
+        available_account_files=account_items,
+    )
+    forced_account = runtime_plan["forced_account"]
+    if runtime_plan["prefer_root_state"]:
+        state_file = STATE_FILE
+    elif forced_account:
+        state_file = forced_account
+    elif account_items:
+        state_file = account_items[0]
+    else:
+        raise FileNotFoundError("未找到可用的登录状态文件，无法继续执行任务。")
+    if not os.path.exists(state_file):
+        raise FileNotFoundError(f"登录状态文件不存在: {state_file}")
+
+    snapshot_data = None
+    try:
+        with open(state_file, "r", encoding="utf-8") as handle:
+            snapshot_data = json.load(handle)
+    except Exception as exc:
+        print(f"警告：读取登录状态文件失败，将直接按路径使用: {exc}")
+
+    playwright = await async_playwright().start()
+    launch_args = [
+        "--disable-blink-features=AutomationControlled",
+        "--disable-dev-shm-usage",
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-web-security",
+        "--disable-features=IsolateOrigins,site-per-process",
+    ]
+    launch_kwargs = {
+        "headless": RUN_HEADLESS,
+        "args": launch_args,
+        "channel": _resolve_browser_channel(),
+    }
+    browser = await playwright.chromium.launch(**launch_kwargs)
+    context_kwargs = _default_context_options()
+    storage_state_arg = state_file
+    if isinstance(snapshot_data, dict):
+        if any(key in snapshot_data for key in ("env", "headers", "page", "storage")):
+            storage_state_arg = {"cookies": snapshot_data.get("cookies", [])}
+            context_kwargs.update(_build_context_overrides(snapshot_data))
+            extra_headers = _build_extra_headers(snapshot_data.get("headers"))
+            if extra_headers:
+                context_kwargs["extra_http_headers"] = extra_headers
+        else:
+            storage_state_arg = snapshot_data
+    context = await browser.new_context(
+        storage_state=storage_state_arg,
+        **_clean_kwargs(context_kwargs),
+    )
+    await context.add_init_script("""
+        Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+        window.chrome = {runtime: {}};
+    """)
+    return playwright, browser, context, state_file
 
 
 async def scrape_xianyu(task_config: dict, debug_limit: int = 0):

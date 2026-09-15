@@ -52,7 +52,8 @@ def upsert_task_sql() -> str:
         max_pages, personal_only, min_price, max_price, cron,
         ai_prompt_base_file, ai_prompt_criteria_file, account_state_file,
         account_strategy, free_shipping, new_publish_option, region,
-        decision_mode, keyword_rules_json, is_running
+        decision_mode, keyword_rules_json, is_running,
+        task_type, seller_user_ids_json, seller_urls_json, collect_ratings
     """
     return f"""
         INSERT INTO tasks ({columns}) VALUES (
@@ -60,7 +61,8 @@ def upsert_task_sql() -> str:
             :max_pages, :personal_only, :min_price, :max_price, :cron,
             :ai_prompt_base_file, :ai_prompt_criteria_file, :account_state_file,
             :account_strategy, :free_shipping, :new_publish_option, :region,
-            :decision_mode, :keyword_rules_json, :is_running
+            :decision_mode, :keyword_rules_json, :is_running,
+            :task_type, :seller_user_ids_json, :seller_urls_json, :collect_ratings
         )
         ON CONFLICT (id) DO UPDATE SET
             task_name = EXCLUDED.task_name,
@@ -82,7 +84,11 @@ def upsert_task_sql() -> str:
             region = EXCLUDED.region,
             decision_mode = EXCLUDED.decision_mode,
             keyword_rules_json = EXCLUDED.keyword_rules_json,
-            is_running = EXCLUDED.is_running
+            is_running = EXCLUDED.is_running,
+            task_type = EXCLUDED.task_type,
+            seller_user_ids_json = EXCLUDED.seller_user_ids_json,
+            seller_urls_json = EXCLUDED.seller_urls_json,
+            collect_ratings = EXCLUDED.collect_ratings
     """
 
 

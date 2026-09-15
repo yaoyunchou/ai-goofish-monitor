@@ -47,6 +47,14 @@ export interface DashboardSnapshot {
   task_summaries: DashboardTaskSummary[]
   recent_activities: DashboardActivity[]
   focus_file: string | null
+  shop_overview?: {
+    shop_name?: string | null
+    captured_at?: string | null
+    showPv?: number | string | null
+    ipv?: number | string | null
+    vstUv?: number | string | null
+    payOrdCnt?: number | string | null
+  }
 }
 
 export interface DashboardSuggestion {

@@ -29,6 +29,7 @@ const {
   activities,
   isLoading,
   error,
+  shopOverview,
 } = useDashboard()
 
 const statCards = computed(() => [
@@ -172,6 +173,32 @@ function openActivity(activity: { filename: string | null; type: string }) {
           <div class="mt-4 text-xs font-bold text-slate-500">
             {{ stat.detail }}
           </div>
+        </CardContent>
+      </Card>
+    </div>
+    <div v-if="shopOverview && (shopOverview.showPv != null || shopOverview.ipv != null)" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <Card class="app-surface border-none">
+        <CardContent class="p-4">
+          <p class="text-xs text-slate-400">{{ t('shopAnalytics.showPv') }}</p>
+          <p class="text-xl font-black">{{ shopOverview.showPv ?? '-' }}</p>
+        </CardContent>
+      </Card>
+      <Card class="app-surface border-none">
+        <CardContent class="p-4">
+          <p class="text-xs text-slate-400">{{ t('shopAnalytics.ipv') }}</p>
+          <p class="text-xl font-black">{{ shopOverview.ipv ?? '-' }}</p>
+        </CardContent>
+      </Card>
+      <Card class="app-surface border-none">
+        <CardContent class="p-4">
+          <p class="text-xs text-slate-400">{{ t('shopAnalytics.vstUv') }}</p>
+          <p class="text-xl font-black">{{ shopOverview.vstUv ?? '-' }}</p>
+        </CardContent>
+      </Card>
+      <Card class="app-surface border-none">
+        <CardContent class="p-4">
+          <p class="text-xs text-slate-400">{{ t('shopAnalytics.payOrdCnt') }}</p>
+          <p class="text-xl font-black">{{ shopOverview.payOrdCnt ?? '-' }}</p>
         </CardContent>
       </Card>
     </div>

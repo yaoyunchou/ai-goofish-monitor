@@ -120,7 +120,8 @@ async def _parse_user_items_data(items_json: list) -> list:
             "商品标题": data.get('title'),
             "商品价格": data.get('priceInfo', {}).get('price'),
             "商品主图": data.get('picInfo', {}).get('picUrl'),
-            "商品状态": status_text
+            "商品状态": status_text,
+            "商品链接": f"https://www.goofish.com/item?id={data.get('id')}" if data.get('id') else "",
         })
     return parsed_list
 
@@ -136,13 +137,19 @@ async def parse_user_head_data(head_json: dict) -> dict:
         elif await safe_get(tag, 'attributes', 'role') == 'buyer':
             buyer_credit = {'level': await safe_get(tag, 'attributes', 'level'), 'text': tag.get('text')}
     return {
+        "卖家ID": await safe_get(data, 'baseInfo', 'kcUserId', default=''),
         "卖家昵称": await safe_get(data, 'module', 'base', 'displayName'),
         "卖家头像链接": await safe_get(data, 'module', 'base', 'avatar', 'avatar'),
         "卖家个性签名": await safe_get(data, 'module', 'base', 'introduction', default=''),
         "卖家在售/已售商品数": await safe_get(data, 'module', 'tabs', 'item', 'number'),
         "卖家收到的评价总数": await safe_get(data, 'module', 'tabs', 'rate', 'number'),
         "卖家信用等级": seller_credit.get('text', '暂无'),
-        "买家信用等级": buyer_credit.get('text', '暂无')
+        "买家信用等级": buyer_credit.get('text', '暂无'),
+        "鱼小铺等级": await safe_get(data, 'module', 'shop', 'level', default=''),
+        "店铺积分": await safe_get(data, 'module', 'shop', 'score', default=None),
+        "好评率": await safe_get(data, 'module', 'shop', 'praiseRatio', default=None),
+        "粉丝数": await safe_get(data, 'module', 'social', 'followers', default=None),
+        "关注数": await safe_get(data, 'module', 'social', 'following', default=None),
     }
 
 

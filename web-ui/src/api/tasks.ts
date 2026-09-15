@@ -21,6 +21,16 @@ export async function createTaskWithAI(data: TaskGenerateRequest): Promise<TaskC
   })
 }
 
+export async function createTask(data: TaskGenerateRequest): Promise<TaskCreateResponse> {
+  return await http('/api/tasks/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ ...data, enabled: true }),
+  })
+}
+
 export async function getTaskGenerationJob(jobId: string): Promise<TaskGenerationJob> {
   const result = await http(`/api/tasks/generate-jobs/${jobId}`)
   return result.job

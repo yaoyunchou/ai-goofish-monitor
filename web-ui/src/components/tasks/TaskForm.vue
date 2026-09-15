@@ -33,6 +33,7 @@ const form = ref<any>({})
 const accountStrategy = ref<'auto' | 'fixed' | 'rotate'>('auto')
 const selectedAccountStateFile = ref(AUTO_ACCOUNT_VALUE)
 const keywordRulesInput = ref('')
+const sellerUrlsInput = ref('')
 const cronMode = ref<'preset' | 'custom'>('preset')
 
 // 常用 cron 预设选项
@@ -113,8 +114,10 @@ watch(() => [props.mode, props.initialData, props.defaultValues, props.defaultAc
         defaultValues.new_publish_option || props.initialData.new_publish_option || '__none__',
       region: defaultValues.region || props.initialData.region || '',
       decision_mode: defaultValues.decision_mode || props.initialData.decision_mode || 'ai',
+      task_type: defaultValues.task_type || props.initialData.task_type || 'keyword_search',
     }
     keywordRulesInput.value = (defaultValues.keyword_rules || props.initialData.keyword_rules || []).join('\n')
+    sellerUrlsInput.value = (defaultValues.seller_urls || props.initialData.seller_urls || props.initialData.seller_user_ids || []).join('\n')
     // 编辑模式下，根据 cron 值判断模式
     const cronVal = defaultValues.cron ?? props.initialData.cron ?? ''
     cronMode.value = isPresetCronValue(cronVal) ? 'preset' : 'custom'
@@ -135,6 +138,7 @@ watch(() => [props.mode, props.initialData, props.defaultValues, props.defaultAc
       new_publish_option: '__none__',
       region: '',
       decision_mode: 'ai',
+      task_type: 'keyword_search',
       ...defaultValues,
     }
     if (!form.value.account_strategy) {
@@ -147,6 +151,7 @@ watch(() => [props.mode, props.initialData, props.defaultValues, props.defaultAc
       form.value.new_publish_option = '__none__'
     }
     keywordRulesInput.value = ''
+    sellerUrlsInput.value = (defaultValues.seller_urls || []).join('\n')
     if (defaultValues.keyword_rules && defaultValues.keyword_rules.length > 0) {
       keywordRulesInput.value = defaultValues.keyword_rules.join('\n')
     }
@@ -174,6 +179,16 @@ watch(selectedAccountStateFile, (value) => {
   form.value.account_state_file = value || props.defaultAccount || AUTO_ACCOUNT_VALUE
 })
 
+watch(
+  () => form.value.task_type,
+  (taskType) => {
+    if (props.mode === 'edit') return
+    if (taskType === 'shop_datacompass') {
+      accountStrategy.value = 'fixed'
+      if (!form.value.cron) form.value.cron = '0 8 * * *'
+  },
+)
+
 function handleAccountStrategyChange(event: Event) {
   const value = (event.target as HTMLSelectElement).value as 'auto' | 'fixed' | 'rotate'
   accountStrategy.value = value
@@ -184,7 +199,7 @@ function handleAccountStateFileChange(event: Event) {
 }
 
 function handleSubmit() {
-  if (!form.value.task_name || !form.value.keyword) {
+  if (!form.value.task_name) {
     toast({
       title: t('tasks.form.validation.incomplete'),
       description: t('tasks.form.validation.nameAndKeywordRequired'),
@@ -193,8 +208,19 @@ function handleSubmit() {
     return
   }
 
+  const taskType = form.value.task_type || 'keyword_search'
+  const sellerIds = parseKeywordText(sellerUrlsInput.value)
+
+  if (taskType === 'keyword_search' && !form.value.keyword) {
+    toast({
+      title: t('tasks.form.validation.incomplete'),
+      description: t('tasks.form.validation.nameAndKeywordRequired'),
+      variant: 'destructive',
+    })
+    return
+  }
   const decisionMode = form.value.decision_mode || 'ai'
-  if (decisionMode === 'ai' && !String(form.value.description || '').trim()) {
+  if (taskType === 'keyword_search' && decisionMode === 'ai' && !String(form.value.description || '').trim()) {
     toast({
       title: t('tasks.form.validation.incomplete'),
       description: t('tasks.form.validation.aiDescriptionRequired'),
@@ -204,7 +230,7 @@ function handleSubmit() {
   }
 
   const keywordRules = parseKeywordText(keywordRulesInput.value)
-  if (decisionMode === 'keyword' && keywordRules.length === 0) {
+  if (taskType === 'keyword_search' && decisionMode === 'keyword' && keywordRules.length === 0) {
     toast({
       title: t('tasks.form.validation.keywordRuleIncomplete'),
       description: t('tasks.form.validation.keywordRuleRequired'),
@@ -216,6 +242,14 @@ function handleSubmit() {
   // Filter out fields that shouldn't be sent in update requests
   const { id, is_running, next_run_at, ...submitData } = form.value as any
   const currentAccountStrategy = accountStrategy.value || 'auto'
+  if (taskType === 'shop_datacompass' && currentAccountStrategy !== 'fixed') {
+    toast({
+      title: t('tasks.form.validation.accountStrategyIncomplete'),
+      description: t('tasks.form.shopAccountRequired'),
+      variant: 'destructive',
+    })
+    return
+  }
   if (currentAccountStrategy === 'fixed') {
     const currentAccountStateFile = selectedAccountStateFile.value || AUTO_ACCOUNT_VALUE
     if (currentAccountStateFile === AUTO_ACCOUNT_VALUE) {
@@ -245,12 +279,16 @@ function handleSubmit() {
     submitData.new_publish_option = ''
   }
 
-  submitData.decision_mode = decisionMode
+  submitData.task_type = taskType
+  submitData.seller_urls = sellerIds
+  submitData.seller_user_ids = sellerIds
+  submitData.decision_mode = taskType === 'keyword_search' ? decisionMode : 'keyword'
   submitData.account_strategy = currentAccountStrategy
   submitData.analyze_images = submitData.analyze_images !== false
-  submitData.keyword_rules = decisionMode === 'keyword' ? keywordRules : []
-  if (decisionMode === 'keyword' && !submitData.description) {
-    submitData.description = ''
+  submitData.keyword_rules = decisionMode === 'keyword' && taskType === 'keyword_search' ? keywordRules : []
+  if (taskType !== 'keyword_search') {
+    submitData.description = submitData.description || ''
+    submitData.keyword = submitData.keyword || ''
   }
 
   emit('submit', submitData)
@@ -265,9 +303,24 @@ function handleSubmit() {
         <Input id="task-name" v-model="form.task_name" class="sm:col-span-3" :placeholder="t('tasks.form.taskNamePlaceholder')" required />
       </div>
       <div class="grid gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
-        <Label for="keyword" class="sm:text-right">{{ t('tasks.form.keyword') }}</Label>
-        <Input id="keyword" v-model="form.keyword" class="sm:col-span-3" :placeholder="t('tasks.form.keywordPlaceholder')" required />
+        <Label class="sm:text-right">{{ t('tasks.form.taskType') }}</Label>
+        <div class="sm:col-span-3">
+          <Select v-model="form.task_type">
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="keyword_search">{{ t('tasks.form.taskTypeSearch') }}</SelectItem>
+              <SelectItem value="shop_datacompass">{{ t('tasks.form.taskTypeShop') }}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
+      <div v-if="form.task_type !== 'shop_datacompass'" class="grid gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
+        <Label for="keyword" class="sm:text-right">{{ t('tasks.form.keyword') }}</Label>
+        <Input id="keyword" v-model="form.keyword" class="sm:col-span-3" :placeholder="t('tasks.form.keywordPlaceholder')" :required="form.task_type === 'keyword_search'" />
+      </div>
+      <template v-if="form.task_type === 'keyword_search'">
       <div class="grid gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
         <Label class="sm:text-right">{{ t('tasks.form.decisionMode') }}</Label>
         <div class="sm:col-span-3">
@@ -331,6 +384,7 @@ function handleSubmit() {
         <Label for="max-pages" class="sm:text-right">{{ t('tasks.form.maxPages') }}</Label>
         <Input id="max-pages" v-model.number="form.max_pages" type="number" class="sm:col-span-3" />
       </div>
+      </template>
       <div class="grid gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
         <Label for="cron" class="sm:text-right">{{ t('tasks.form.schedule') }}</Label>
         <div class="space-y-2 sm:col-span-3">
@@ -399,6 +453,7 @@ function handleSubmit() {
           </select>
         </div>
       </div>
+      <template v-if="form.task_type === 'keyword_search'">
       <div class="grid gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">
         <Label for="personal-only" class="sm:text-right">{{ t('tasks.form.personalOnly') }}</Label>
         <div class="sm:col-span-3">
@@ -436,6 +491,7 @@ function handleSubmit() {
           <p class="text-xs text-gray-500">{{ t('tasks.form.regionHint') }}</p>
         </div>
       </div>
+      </template>
     </div>
   </form>
 </template>

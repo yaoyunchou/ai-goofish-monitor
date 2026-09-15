@@ -33,6 +33,18 @@ def test_create_list_update_delete_task(api_client, api_context, sample_task_pay
     assert response.json() == []
 
 
+def test_delete_task_is_idempotent(api_client, sample_task_payload):
+    response = api_client.post("/api/tasks/", json=sample_task_payload)
+    assert response.status_code == 200
+
+    first = api_client.delete("/api/tasks/0")
+    second = api_client.delete("/api/tasks/0")
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert api_client.get("/api/tasks").json() == []
+
+
 def test_start_stop_task_updates_status(api_client, api_context, sample_task_payload):
     response = api_client.post("/api/tasks/", json=sample_task_payload)
     assert response.status_code == 200
@@ -193,3 +205,23 @@ def test_delete_task_stops_runtime_and_reindexes_process_state(
     process_service = api_context["process_service"]
     assert process_service.stopped == [0]
     assert process_service.reindexed == []
+
+
+def test_create_seller_subscription_task(api_client):
+    payload = {
+        "task_name": "竞品店铺监控",
+        "task_type": "seller_subscription",
+        "seller_urls": [
+            "https://www.goofish.com/personal?userId=2221197154547",
+            "1234567890",
+        ],
+        "cron": "0 */2 * * *",
+        "max_pages": 1,
+        "personal_only": True,
+    }
+    response = api_client.post("/api/tasks/", json=payload)
+    assert response.status_code == 200
+    task = response.json()["task"]
+    assert task["task_type"] == "seller_subscription"
+    assert task["seller_user_ids"] == ["2221197154547", "1234567890"]
+    assert task["keyword"].startswith("seller_sub_")

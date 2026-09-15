@@ -9,10 +9,19 @@ from typing import Any, List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from src.core.cron_utils import validate_cron_expression
+from src.domain.seller_ids import (
+    build_shop_datacompass_keyword,
+    build_subscription_keyword,
+    parse_seller_user_ids,
+)
 from src.services.account_strategy_service import (
     clean_account_state_file,
     normalize_account_strategy,
 )
+
+TASK_TYPE_KEYWORD = "keyword_search"
+TASK_TYPE_SELLER_SUBSCRIPTION = "seller_subscription"
+TASK_TYPE_SHOP_DATACOMPASS = "shop_datacompass"
 
 
 class TaskStatus(str, Enum):
@@ -79,6 +88,24 @@ def _normalize_payload_keywords(payload: Any) -> Any:
         values["keyword_rules"] = _extract_keywords_from_legacy_groups(
             values.get("keyword_rule_groups")
         )
+    seller_ids = parse_seller_user_ids(
+        values.get("seller_user_ids"),
+        values.get("seller_urls"),
+    )
+    if seller_ids:
+        values["seller_user_ids"] = seller_ids
+    if "seller_urls" in values:
+        values["seller_urls"] = _normalize_keyword_values(values.get("seller_urls"))
+    task_type = str(values.get("task_type") or TASK_TYPE_KEYWORD).strip()
+    if task_type not in {TASK_TYPE_KEYWORD, TASK_TYPE_SELLER_SUBSCRIPTION, TASK_TYPE_SHOP_DATACOMPASS}:
+        task_type = TASK_TYPE_KEYWORD
+    values["task_type"] = task_type
+    keyword = str(values.get("keyword") or "").strip()
+    task_name = str(values.get("task_name") or "").strip()
+    if task_type == TASK_TYPE_SELLER_SUBSCRIPTION and not keyword:
+        values["keyword"] = build_subscription_keyword(task_name)
+    if task_type == TASK_TYPE_SHOP_DATACOMPASS and not keyword:
+        values["keyword"] = build_shop_datacompass_keyword(task_name)
     return values
 
 
@@ -113,6 +140,12 @@ class Task(BaseModel):
     task_name: str
     enabled: bool
     keyword: str
+    task_type: Literal["keyword_search", "seller_subscription", "shop_datacompass"] = (
+        TASK_TYPE_KEYWORD
+    )
+    seller_user_ids: List[str] = Field(default_factory=list)
+    seller_urls: List[str] = Field(default_factory=list)
+    collect_ratings: bool = False
     description: Optional[str] = ""
     analyze_images: bool = True
     max_pages: int
@@ -136,10 +169,15 @@ class Task(BaseModel):
     def normalize_legacy_keyword_payload(cls, values):
         return _normalize_payload_keywords(values)
 
-    @field_validator("keyword_rules", mode="before")
+    @field_validator("keyword_rules", "seller_urls", mode="before")
     @classmethod
     def normalize_keyword_rules(cls, value):
         return _normalize_keyword_values(value)
+
+    @field_validator("seller_user_ids", mode="before")
+    @classmethod
+    def normalize_seller_user_ids(cls, value):
+        return parse_seller_user_ids(value)
 
     def can_start(self) -> bool:
         """检查任务是否可以启动"""
@@ -162,7 +200,13 @@ class TaskCreate(BaseModel):
 
     task_name: str
     enabled: bool = True
-    keyword: str
+    keyword: str = ""
+    task_type: Literal["keyword_search", "seller_subscription", "shop_datacompass"] = (
+        TASK_TYPE_KEYWORD
+    )
+    seller_user_ids: List[str] = Field(default_factory=list)
+    seller_urls: List[str] = Field(default_factory=list)
+    collect_ratings: bool = False
     description: Optional[str] = ""
     analyze_images: bool = True
     max_pages: int = 3
@@ -205,13 +249,32 @@ class TaskCreate(BaseModel):
     def validate_cron(cls, value):
         return _validate_cron_expression(value)
 
-    @field_validator("keyword_rules", mode="before")
+    @field_validator("keyword_rules", "seller_urls", mode="before")
     @classmethod
     def normalize_keyword_rules(cls, value):
         return _normalize_keyword_values(value)
 
+    @field_validator("seller_user_ids", mode="before")
+    @classmethod
+    def normalize_seller_user_ids(cls, value):
+        return parse_seller_user_ids(value)
+
     @model_validator(mode="after")
     def validate_decision_mode_payload(self):
+        if self.task_type == TASK_TYPE_SELLER_SUBSCRIPTION:
+            if not self.seller_user_ids:
+                raise ValueError("订阅卖家任务至少需要一个用户店铺链接或 userId。")
+            if not str(self.keyword or "").strip():
+                self.keyword = build_subscription_keyword(self.task_name)
+            return self
+        if self.task_type == TASK_TYPE_SHOP_DATACOMPASS:
+            if self.account_strategy != "fixed" or not self.account_state_file:
+                raise ValueError("店铺数据罗盘任务必须绑定固定卖家账号。")
+            if not str(self.keyword or "").strip():
+                self.keyword = build_shop_datacompass_keyword(self.task_name)
+            return self
+        if not str(self.keyword or "").strip():
+            raise ValueError("搜索任务必须填写关键词。")
         description = str(self.description or "").strip()
         if self.decision_mode == "ai" and not description:
             raise ValueError("AI 判断模式下，详细需求(description)不能为空。")
@@ -230,6 +293,10 @@ class TaskUpdate(BaseModel):
     task_name: Optional[str] = None
     enabled: Optional[bool] = None
     keyword: Optional[str] = None
+    task_type: Optional[Literal["keyword_search", "seller_subscription", "shop_datacompass"]] = None
+    seller_user_ids: Optional[List[str]] = None
+    seller_urls: Optional[List[str]] = None
+    collect_ratings: Optional[bool] = None
     description: Optional[str] = None
     analyze_images: Optional[bool] = None
     max_pages: Optional[int] = None
@@ -273,13 +340,27 @@ class TaskUpdate(BaseModel):
     def validate_cron(cls, value):
         return _validate_cron_expression(value)
 
-    @field_validator("keyword_rules", mode="before")
+    @field_validator("keyword_rules", "seller_urls", mode="before")
     @classmethod
     def normalize_keyword_rules(cls, value):
+        if value is None:
+            return value
         return _normalize_keyword_values(value)
+
+    @field_validator("seller_user_ids", mode="before")
+    @classmethod
+    def normalize_seller_user_ids(cls, value):
+        if value is None:
+            return value
+        return parse_seller_user_ids(value)
 
     @model_validator(mode="after")
     def validate_partial_keyword_payload(self):
+        if self.task_type == TASK_TYPE_SELLER_SUBSCRIPTION and self.seller_user_ids is not None:
+            if not self.seller_user_ids:
+                raise ValueError("订阅卖家任务至少需要一个用户店铺链接或 userId。")
+        if self.task_type == TASK_TYPE_SHOP_DATACOMPASS:
+            return self
         if self.decision_mode == "keyword" and self.keyword_rules is not None:
             if not _has_keyword_rules(self.keyword_rules):
                 raise ValueError("关键词判断模式下，至少需要一个关键词。")
