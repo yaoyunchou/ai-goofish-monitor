@@ -1,0 +1,44 @@
+{
+    // 后端调试：F5 启动 FastAPI；前端请自行在 web-ui 目录执行 npm run dev
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Backend: FastAPI (debug)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": [
+                "src.app:app",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8000"
+            ],
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "jinja": true
+        },
+        {
+            "name": "Backend: FastAPI (reload)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": [
+                "src.app:app",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8000",
+                "--reload"
+            ],
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "jinja": true,
+            "subProcess": true
+        }
+    ]
+}

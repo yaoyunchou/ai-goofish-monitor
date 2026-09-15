@@ -1,5 +1,21 @@
 # 变更日志
 
+## 2026-09-15
+
+### chore(vscode): 后端 FastAPI 调试配置
+
+- 更新 `.vscode/launch.json`：`Backend: FastAPI (debug)` 用于断点调试；`Backend: FastAPI (reload)` 支持热重载（需 `subProcess`）
+- 自动加载 `${workspaceFolder}/.env`，监听 `0.0.0.0:8000`；前端请在 `web-ui` 自行 `npm run dev`
+
+## 2026-09-09
+
+### chore(dev): 本机启动 Web 服务
+
+- 本机无 Docker / 本地 Postgres，使用已有 Supabase `goodfish`（`DATABASE_URL` 来自 gitignore 的 `.env`，未入库）
+- 安装缺失 Python 依赖（`psycopg` 等），`python -m scripts.verify_database` 通过
+- 使用 Node 22 完成 `web-ui` 生产构建（当前 PATH 默认 Node 18 不满足 Vite 7）
+- 后端 `python -m src.app` 已监听 `http://127.0.0.1:8000`，`/health` 与登录校验通过
+
 ## 2026-08-05
 
 ### chore(dev): 本地一键 PostgreSQL + 前端构建
