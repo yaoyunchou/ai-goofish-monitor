@@ -31,6 +31,13 @@ chmod +x start.sh
 ./start.sh
 ```
 
+Windows（在 cmd 或资源管理器里运行 `start.bat`）：
+
+```bat
+start.bat        :: 正式模式：装依赖 -> 构建前端 -> 启动后端
+start.bat dev    :: 开发模式：后端 + 前端热更新
+```
+
 Docker 部署：
 
 ```bash

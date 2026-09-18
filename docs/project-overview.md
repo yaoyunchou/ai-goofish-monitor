@@ -156,7 +156,9 @@ ai-goofish-monitor/
 | `.env` / `.env.example` | 环境变量配置 |
 | `Dockerfile` / `Dockerfile.base` / `Dockerfile.release` | 镜像构建文件 |
 | `docker-compose.yaml` / `.dev.yaml` / `.dev.yml` | 部署编排 |
-| `start.sh` | 一键启动脚本 |
+| `start.sh` | 一键启动脚本（macOS / Linux） |
+| `start.bat` | 一键启动脚本（Windows，支持 run/dev/build/check 模式） |
+| `dev_start.bat` | 开发模式启动脚本（后端 + 前端热更新） |
 | `desktop_launcher.py` | 桌面端打包启动器（PyInstaller） |
 | `run_live_smoke.sh` | 真实流量冒烟测试脚本 |
 | `CLAUDE.md` / `AGENTS.md` | AI 助手与贡献者指南 |

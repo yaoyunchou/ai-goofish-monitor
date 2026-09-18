@@ -193,6 +193,23 @@ chmod +x start.sh
 
 `start.sh` 会先检查 Playwright CLI 和浏览器前置条件；在前置条件满足后自动安装项目依赖、构建前端、复制构建产物并启动后端。
 
+### 一键启动（Windows）
+
+Windows 下用根目录的 `start.bat`（等价于 `start.sh` 的 Windows 版本，双击或在 cmd 里运行）：
+
+```bat
+start.bat            :: 正式模式：装依赖 -> 构建前端 -> 启动后端（单端口 8000）
+start.bat dev        :: 开发模式：后端 + 前端 dev server（热更新，前端 5173）
+start.bat build      :: 只构建前端，不启动服务
+start.bat check      :: 只做环境检查
+start.bat help       :: 显示帮助
+```
+
+- 端口统一从 `.env` 的 `SERVER_PORT` 读取，改一处即可
+- 自动优先使用项目 `.venv\Scripts\python.exe`（存在时），否则回退到系统 `python`
+- 依赖安装结果按 `requirements.txt` 的修改时间打桩缓存，未变更时跳过 `pip install`
+- 正式模式下若 `dist/` 已比 `web-ui/src/` 新，会跳过前端构建（强制重建用 `start.bat build`）
+
 ### 手动启动
 
 ```bash
