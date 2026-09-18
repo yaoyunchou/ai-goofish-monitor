@@ -4,7 +4,11 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Dict, List, Optional
+
+# 标题中分隔多个规格属性的字符：顿号与中英文逗号
+_SKU_FRAGMENT_SEPARATOR_PATTERN = re.compile(r"[、,，]")
 
 
 def _format_price(value: Any) -> tuple[Optional[float], str]:
@@ -191,17 +195,23 @@ async def extract_skus_from_detail_payloads(
 
 
 def parse_title_sku_fragments(title: str) -> List[Dict[str, str]]:
-    """从搜索标题中解析「颜色分类 / 长度」类片段（无多 SKU 价时的补充）。"""
+    """从搜索标题中解析「颜色分类 / 长度」类片段（无多 SKU 价时的补充）。
+
+    闲鱼标题中同一商品的多个规格属性常用顿号「、」或中英文逗号分隔，例如
+    「标题 颜色分类: 白色、长度: 2m」，因此这些分隔符都需识别为片段边界。
+    """
     text = str(title or "")
     if not text:
         return []
     fragments: List[Dict[str, str]] = []
-    for segment in text.replace("，", ",").split(","):
+    for segment in _SKU_FRAGMENT_SEPARATOR_PATTERN.split(text):
         piece = segment.strip()
         if ":" in piece or "：" in piece:
             sep = "：" if "：" in piece else ":"
             name, value = piece.split(sep, 1)
-            name = name.strip()
+            # 第一个片段可能带上标题正文（如「标题 颜色分类: 白色」），
+            # 取最后一个空白段作为属性名，避免把标题正文混进 name。
+            name = name.strip().rsplit(maxsplit=1)[-1] if name.strip() else ""
             value = value.strip()
             if name and value:
                 fragments.append({"name": name, "value": value})

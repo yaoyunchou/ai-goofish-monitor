@@ -303,7 +303,17 @@ if [ ! -f "requirements.txt" ]; then
 fi
 
 echo "正在安装 Python 依赖..."
-python3 -m pip install -r requirements.txt --quiet
+# 优先使用项目虚拟环境 .venv，避免污染系统 Python
+if [ -x ".venv/Scripts/python.exe" ]; then
+    RUN_PYTHON=".venv/Scripts/python.exe"
+elif [ -x ".venv/bin/python" ]; then
+    RUN_PYTHON=".venv/bin/python"
+else
+    RUN_PYTHON="$PYTHON_CMD"
+fi
+
+echo "使用 Python: $RUN_PYTHON"
+"$RUN_PYTHON" -m pip install -r requirements.txt --quiet
 echo -e "${GREEN}✓ Python 依赖安装完成${NC}"
 
 # 3. 构建前端
@@ -345,4 +355,4 @@ echo -e "${GREEN}访问地址: http://localhost:8000${NC}"
 echo -e "${GREEN}API 文档: http://localhost:8000/docs${NC}"
 echo -e "${GREEN}========================================${NC}\n"
 
-python3 -m src.app
+"$RUN_PYTHON" -m src.app

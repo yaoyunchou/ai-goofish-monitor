@@ -42,7 +42,7 @@ class _FakeProcessService:
         self.stop_all_called = True
 
 
-def test_lifespan_cleans_task_logs_on_startup(monkeypatch):
+def test_lifespan_cleans_task_logs_on_startup(monkeypatch, offline_db):
     called = {}
     fake_scheduler = _FakeSchedulerService()
     fake_process = _FakeProcessService()
@@ -64,6 +64,9 @@ def test_lifespan_cleans_task_logs_on_startup(monkeypatch):
     monkeypatch.setattr(app_module, "set_subscription_running", _noop_running)
     monkeypatch.setattr(app_module, "get_schedule", _empty_schedule)
     monkeypatch.setattr(app_module, "bootstrap_storage", lambda: called.setdefault("bootstrapped", True))
+    # lifespan 还会调用 migrate_legacy_subscription_tasks()，它内部自行
+    # create_task_repository()，无法被上面的 stub 覆盖；用 offline_db 让该路径
+    # 走真实仓储代码 + 内存 SQLite，而不是去连 Supabase。
     monkeypatch.setattr(
         app_module,
         "cleanup_task_logs",

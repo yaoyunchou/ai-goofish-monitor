@@ -1,6 +1,5 @@
 import asyncio
 import os
-import sys
 from types import SimpleNamespace
 
 import pytest
@@ -281,13 +280,26 @@ def test_sanitize_no_proxy_noop_without_env(monkeypatch):
     _sanitize_no_proxy_env()
 
 
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="Windows 环境变量大小写不敏感，NO_PROXY 与 no_proxy 是同一变量，"
+    "无法分别设置两者；该用例仅在 POSIX 平台有意义。",
+)
 def test_sanitize_no_proxy_handles_both_keys(monkeypatch):
     monkeypatch.setenv("NO_PROXY", "::1/128")
     monkeypatch.setenv("no_proxy", "fe80::1/10")
     _sanitize_no_proxy_env()
-    if sys.platform == "win32":
-        # Windows treats NO_PROXY and no_proxy as the same environment variable.
-        assert os.environ["NO_PROXY"] == "fe80::1"
-    else:
-        assert os.environ["NO_PROXY"] == "::1"
-        assert os.environ["no_proxy"] == "fe80::1"
+    assert os.environ["NO_PROXY"] == "::1"
+    assert os.environ["no_proxy"] == "fe80::1"
+
+
+@pytest.mark.skipif(
+    os.name != "nt",
+    reason="仅在 Windows（环境变量大小写不敏感）下验证；POSIX 上两键相互独立，"
+    "由 test_sanitize_no_proxy_handles_both_keys 覆盖。",
+)
+def test_sanitize_no_proxy_handles_single_key_on_windows(monkeypatch):
+    """Windows 上大小写不敏感，两个键实为同一变量，验证单键清理行为即可。"""
+    monkeypatch.setenv("NO_PROXY", "::1/128,fe80::1/10")
+    _sanitize_no_proxy_env()
+    assert os.environ["NO_PROXY"] == "::1,fe80::1"

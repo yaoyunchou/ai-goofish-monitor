@@ -84,19 +84,6 @@ const displayDescription = computed(() => {
   return typeof desc === 'string' ? desc : ''
 })
 
-/**
- * 日指标优先；缺日指标时回退到原始抓取字段。
- * 两个字段名都带上：闲鱼不同接口一个用「“想要”人数」一个用「想要人数」，
- * 只取其中一个会出现「有数据却显示 -」。
- */
-function fallbackMetric(metric: number | null | undefined, ...rawValues: unknown[]) {
-  if (metric !== null && metric !== undefined) return String(metric)
-  for (const value of rawValues) {
-    if (value !== null && value !== undefined && value !== '') return String(value)
-  }
-  return '-'
-}
-
 const trendPoints = computed<ItemTrendPoint[]>(() =>
   [...historyPoints.value]
     .sort((a, b) => {
@@ -233,11 +220,11 @@ onMounted(loadItem)
                 </div>
                 <div>
                   <span class="text-slate-500">{{ t('sellerSubscription.colWant') }}：</span>
-                  <span class="font-medium">{{ fallbackMetric(latestSnapshot?.want_count, productInfo?.['“想要”人数']) }}</span>
+                  <span class="font-medium">{{ latestSnapshot?.want_count ?? productInfo?.['“想要”人数'] ?? '-' }}</span>
                 </div>
                 <div>
                   <span class="text-slate-500">{{ t('sellerSubscription.colView') }}：</span>
-                  <span class="font-medium">{{ fallbackMetric(latestSnapshot?.view_count, productInfo?.['浏览量']) }}</span>
+                  <span class="font-medium">{{ latestSnapshot?.view_count ?? productInfo?.['浏览量'] ?? '-' }}</span>
                 </div>
                 <div>
                   <span class="text-slate-500">{{ t('sellerSubscription.colStatus') }}：</span>

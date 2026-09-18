@@ -9,7 +9,7 @@ def subscription_api_client():
     return TestClient(app)
 
 
-def test_seller_subscription_crud_and_schedule(subscription_api_client):
+def test_seller_subscription_crud_and_schedule(subscription_api_client, offline_db):
     api_client = subscription_api_client
     list_res = api_client.get("/api/seller-subscriptions")
     assert list_res.status_code == 200

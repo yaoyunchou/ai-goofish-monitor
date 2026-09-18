@@ -15,7 +15,7 @@ def _seed_result_records(filename: str, records: list[dict]) -> None:
         asyncio.run(save_result_record(record, keyword))
 
 
-def test_results_filter_and_sort_for_keyword_recommendations(tmp_path, monkeypatch):
+def test_results_filter_and_sort_for_keyword_recommendations(tmp_path, monkeypatch, offline_db):
     monkeypatch.chdir(tmp_path)
     filename = "demo_full_data.jsonl"
 
@@ -82,7 +82,7 @@ def test_results_filter_and_sort_for_keyword_recommendations(tmp_path, monkeypat
     assert resp.status_code == 400
 
 
-def test_results_insights_and_export_csv(tmp_path, monkeypatch):
+def test_results_insights_and_export_csv(tmp_path, monkeypatch, offline_db):
     monkeypatch.chdir(tmp_path)
     filename = "demo_full_data.jsonl"
 
@@ -196,7 +196,7 @@ def test_results_insights_and_export_csv(tmp_path, monkeypatch):
     assert "Demo One" in text
 
 
-def test_results_export_csv_supports_unicode_filename(tmp_path, monkeypatch):
+def test_results_export_csv_supports_unicode_filename(tmp_path, monkeypatch, offline_db):
     monkeypatch.chdir(tmp_path)
     filename = "演示_full_data.jsonl"
 
@@ -234,7 +234,7 @@ def test_results_export_csv_supports_unicode_filename(tmp_path, monkeypatch):
     assert "filename*=UTF-8''%E6%BC%94%E7%A4%BA_full_data.csv" in disposition
 
 
-def test_results_blacklist_rules_hide_items_from_view_and_insights(tmp_path, monkeypatch):
+def test_results_blacklist_rules_hide_items_from_view_and_insights(tmp_path, monkeypatch, offline_db):
     monkeypatch.chdir(tmp_path)
     filename = "macbook_air_m1_full_data.jsonl"
 

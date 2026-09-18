@@ -188,7 +188,8 @@ class SubscriptionPacing:
 
         print(
 
-            f"[订阅策略] {seller_count} 个卖家 × 最多 {items_per_seller} 条/卖家；"
+            f"[订阅策略] {seller_count} 个卖家，每店最多 {items_per_seller} 条"
+            f"（各店独立配额，互不占用）；"
 
             f"详情间隔 {self.config.detail_delay_min}-{self.config.detail_delay_max}s，"
 

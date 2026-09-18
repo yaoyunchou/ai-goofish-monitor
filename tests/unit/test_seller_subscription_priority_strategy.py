@@ -104,26 +104,29 @@ def test_alignment_keeps_captured_sellers_after_never_captured():
     assert ordered[1:] == ["s1", "s3"]
 
 
-def test_never_captured_seller_ids_from_empty_last_captured_at():
+def test_never_captured_seller_ids_from_empty_last_captured_at(monkeypatch):
     rows = [
         {"seller_user_id": "new-shop", "last_captured_at": None},
         {"seller_user_id": "old-shop", "last_captured_at": "2026-09-17T10:00:00+08:00"},
         {"seller_user_id": "also-new", "last_captured_at": ""},
         {"seller_user_id": "  ", "last_captured_at": None},
     ]
-    with patch(
-        "src.seller_subscription_scraper.list_subscriptions_sync",
-        return_value=rows,
-    ):
-        assert _never_captured_seller_ids() == {"new-shop", "also-new"}
+    # 补丁必须打在函数真正的 globals 上：test_cli_spider.py 会 pop 并重新 import
+    # 本模块，导致 sys.modules 中的对象与模块级 import 的函数所闭包的命名空间分离。
+    monkeypatch.setitem(
+        _never_captured_seller_ids.__globals__, "list_subscriptions_sync", lambda: rows
+    )
+    assert _never_captured_seller_ids() == {"new-shop", "also-new"}
 
 
-def test_never_captured_seller_ids_empty_when_storage_fails():
-    with patch(
-        "src.seller_subscription_scraper.list_subscriptions_sync",
-        side_effect=RuntimeError("db down"),
-    ):
-        assert _never_captured_seller_ids() == set()
+def test_never_captured_seller_ids_empty_when_storage_fails(monkeypatch):
+    def _raise():
+        raise RuntimeError("db down")
+
+    monkeypatch.setitem(
+        _never_captured_seller_ids.__globals__, "list_subscriptions_sync", _raise
+    )
+    assert _never_captured_seller_ids() == set()
 
 
 def test_before_list_alignment_uses_short_warmup_not_seller_cooldown():

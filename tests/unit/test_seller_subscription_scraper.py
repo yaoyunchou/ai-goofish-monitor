@@ -14,7 +14,7 @@ def _load_scraper_module():
     return importlib.import_module(_MODULE)
 
 
-def test_scrape_seller_subscription_without_sellers_returns_zero():
+def test_scrape_seller_subscription_without_sellers_returns_zero(offline_db):
     mod = _load_scraper_module()
     saved = asyncio.run(
         mod.scrape_seller_subscription(
@@ -393,3 +393,96 @@ def test_scrape_registered_without_enabled_subscriptions(monkeypatch):
     assert recorded
     assert recorded[-1][2] is False
     assert "没有启用的卖家订阅" in recorded[-1][0]
+
+
+def test_scrape_reports_whole_skipped_seller_in_summary(capsys):
+    """整店被跳过（主页 0 条在售）时，结尾汇总必须显式列出该店。
+
+    回归背景：曾出现「2 个卖家只跑 1 个」，但结尾只打印
+    `扫描 N → 详情 N → 入库 N → 跳过 0`，被 continue 掉的店铺不进任何分母，
+    导致看起来「一切正常」，极易误判。此处锁定新的 [店铺汇总] 输出。
+    """
+    mod = _load_scraper_module()
+
+    profiles = {
+        # A 店正常，有 1 条在售
+        "11111111111": {
+            "卖家ID": "11111111111",
+            "卖家昵称": "正常店",
+            "卖家发布的商品列表": [
+                {
+                    "商品ID": "a-1",
+                    "商品标题": "正常商品",
+                    "商品状态": "在售",
+                    "商品链接": "https://www.goofish.com/item?id=a-1",
+                },
+            ],
+        },
+        # B 店主页解析出 0 条 → 整店跳过
+        "22222222222": {
+            "卖家ID": "22222222222",
+            "卖家昵称": "空店",
+            "卖家发布的商品列表": [],
+        },
+    }
+
+    async def fake_profile(_context, user_id, **_kwargs):
+        return profiles[str(user_id)]
+
+    async def fake_detail(_context, _link):
+        return {
+            "ok": True,
+            "“想要”人数": 5,
+            "浏览量": 20,
+            "商品图片列表": [],
+            "商品描述": "",
+        }
+
+    async def fake_launch(_task_config):
+        browser = AsyncMock()
+        browser.close = AsyncMock()
+        playwright = AsyncMock()
+        playwright.stop = AsyncMock()
+        return playwright, browser, AsyncMock(), "state/test.json"
+
+    pacing = MagicMock()
+    pacing.log_plan = MagicMock()
+    pacing.before_seller = AsyncMock()
+    pacing.before_list_alignment = AsyncMock()
+    pacing.before_profile = AsyncMock()
+    pacing.before_detail = AsyncMock()
+    pacing.after_detail = AsyncMock()
+    with (
+        patch.object(mod, "list_item_ids_with_daily_snapshot_sync", return_value=set()),
+        patch.object(mod.SubscriptionPacing, "from_task_config", return_value=pacing),
+        patch.object(mod, "launch_task_browser", new=AsyncMock(side_effect=fake_launch)),
+        patch.object(mod, "scrape_user_profile", new=AsyncMock(side_effect=fake_profile)),
+        patch.object(mod, "fetch_item_detail", new=AsyncMock(side_effect=fake_detail)),
+        patch.object(mod, "save_seller_profile", new=AsyncMock()),
+        patch.object(mod, "upsert_seller_item_daily_snapshot", new=AsyncMock()),
+        patch.object(mod, "touch_subscription_captured", new=AsyncMock()),
+        patch.object(mod, "_never_captured_seller_ids", return_value=set()),
+    ):
+        saved = asyncio.run(
+            mod.scrape_seller_subscription(
+                {
+                    "task_name": "seller_subscriptions",
+                    "seller_user_ids": ["11111111111", "22222222222"],
+                    "item_limit": 10,
+                }
+            )
+        )
+
+    out = capsys.readouterr().out
+
+    # A 店照常入库；B 店 0 条
+    assert saved == 1
+    # 新增：整店跳过必须被显式汇总，而不是只在中间打一行日志
+    assert "[店铺汇总]" in out, "缺少整店跳过的汇总行"
+    assert "订阅 2 家" in out
+    assert "有商品入库 1 家" in out
+    assert "整店跳过 1 家" in out
+    assert "跳过店铺 22222222222" in out
+    assert "主页无在售商品" in out
+    # 被跳过的店不应出现在「有商品入库」里
+    assert "跳过店铺 11111111111" not in out

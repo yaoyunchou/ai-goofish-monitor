@@ -28,6 +28,7 @@ os.environ.pop("DATABASE_URL", None)
 from src.api import dependencies as deps
 from src.api.routes import tasks
 from tests.fakes.memory_task_repository import InMemoryTaskRepository
+from tests.fakes.sqlite_connection import SqliteConnectionFactory
 from src.services.task_service import TaskService
 from src.services.task_generation_service import TaskGenerationService
 
@@ -35,6 +36,55 @@ from src.services.task_generation_service import TaskGenerationService
 @pytest.fixture()
 def fixtures_dir() -> Path:
     return Path(__file__).parent / "fixtures"
+
+
+@pytest.fixture()
+def offline_db(monkeypatch):
+    """让存储层在无 PG 环境下用内存 SQLite 做真实的 SQL 往返。
+
+    生产代码不改动：只在测试进程内把 `db_connection` 模块的 `db_connection`
+    符号替换为替身工厂。被测代码通过
+    `from ... import db_connection` 取到的是同一个模块对象属性，因此替换后
+    所有存储调用点都会命中替身（`storage_bootstrap` 亦不例外）。
+
+    每个测试独占一套内存库，避免跨用例串数据。
+    """
+    from src.infrastructure.persistence import db_connection as db_connection_module
+
+    factory = SqliteConnectionFactory(name=f"testdb_{id(monkeypatch)}")
+    try:
+        monkeypatch.setattr(
+            db_connection_module, "db_connection", factory, raising=True
+        )
+        # 已被其他模块静态导入的引用也一并替换，保证语义一致。
+        for module in _MODULES_REEXPORTING_DB_CONNECTION:
+            if hasattr(module, "db_connection"):
+                monkeypatch.setattr(module, "db_connection", factory, raising=False)
+        yield factory
+    finally:
+        factory.reset()
+
+
+def _iter_reexporting_modules():
+    import importlib
+    import pkgutil
+
+    import src as src_package
+
+    for module_info in pkgutil.walk_packages(
+        src_package.__path__, prefix="src."
+    ):
+        try:
+            yield importlib.import_module(module_info.name)
+        except Exception:  # pragma: no cover - 可选依赖缺失时跳过
+            continue
+
+
+_MODULES_REEXPORTING_DB_CONNECTION = [
+    module
+    for module in _iter_reexporting_modules()
+    if getattr(module, "db_connection", None) is not None
+]
 
 
 @pytest.fixture()

@@ -1,0 +1,4 @@
+# Windows 批处理必须使用 CRLF，否则在某些环境下无法执行。
+# 仓库其余文件统一按 LF 存储（与 core.autocrlf 行为一致）。
+*.bat text eol=crlf
+*.cmd text eol=crlf

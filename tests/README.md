@@ -6,24 +6,46 @@
 
 | 指标 | 数量 |
 |------|------|
-| 可收集用例 | **186**（含 3 个 live，默认 skip） |
-| 离线基线 | **183 passed, 3 skipped** |
-| 单元测试 | `tests/unit/`（约 43 个文件） |
-| 集成测试 | `tests/integration/`（11 个文件） |
+| 可收集用例 | **186+**（含 3 个 live，默认 skip） |
+| 离线基线 | **0 failed**（见下方「运行测试」） |
+| 单元测试 | `tests/unit/` |
+| 集成测试 | `tests/integration/` |
 | Live 冒烟 | `tests/live/`（需 `RUN_LIVE_TESTS=1`） |
 | 前端单测 | `web-ui/` Vitest smoke（**9** 用例，`npm test`） |
 
 ## 环境准备
 
+在运行测试之前，请确保已安装所有开发依赖项。**推荐使用项目虚拟环境 `.venv`：**
+
 ```bash
-pip install -r requirements.txt
+# 首次创建
+python -m venv .venv
+source .venv/Scripts/activate   # Windows；Linux/macOS 用 .venv/bin/activate
+python -m pip install -r requirements.txt
+
+# 已创建则可直接激活
+source .venv/Scripts/activate
 ```
 
-## 运行命令
+> 也可不激活，直接调用 `./.venv/Scripts/python.exe -m pytest ...`
+
+## 运行测试
+
+> ⚠️ **Windows Git Bash 用户必读**：pytest 9.x 的默认输出捕获与 Git Bash 管道冲突，
+> 直接 `pytest` 会报 `ValueError: underlying buffer has been detached` 并显示 `collected 0 items`。
+> **请务必加 `-s`（或 `--capture=no`）禁用捕获**：
+>
+> ```bash
+> ./.venv/Scripts/python.exe -m pytest tests/ -s
+> ```
+
+### 运行所有测试
 
 ```bash
 # 推荐：全量离线测试
 python -m pytest -q
+
+pytest -s
 
 # 覆盖率
 python -m pytest --cov=src
@@ -38,17 +60,27 @@ python -m pytest tests/unit/test_utils.py::test_safe_get_nested_and_default
 若出现 `collected 0 items` 或 capture 相关错误，使用：
 
 ```bash
+pytest -s tests/integration/test_api_tasks.py
+# 或
 python -m pytest -q --capture=no
 ```
 
 `pyproject.toml` 已默认 `--capture=no`。第三方插件冲突时可设：
 
 ```bash
-$env:PYTEST_DISABLE_PLUGIN_AUTOLOAD="1"
+pytest -s tests/unit/test_utils.py::test_safe_get_nested_and_default
+# 第三方插件冲突时可设：
+export PYTEST_DISABLE_PLUGIN_AUTOLOAD="1"
 python -m pytest -q
 ```
 
 ### CI
+
+```bash
+coverage run -m pytest -s
+coverage report
+coverage html  # 生成 HTML 报告
+```
 
 | 工作流 | 内容 |
 |--------|------|

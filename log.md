@@ -2,6 +2,13 @@
 
 ## 2026-09-18
 
+### fix(seller-subscription): 日志显式报告「整店跳过」，并澄清每店独立配额
+
+- 背景：一次运行 2 个卖家只入库了 1 个，但结尾只打印 `扫描 N → 详情 N → 入库 N → 跳过 0`，被 `continue` 掉的店铺不进任何分母，看起来「一切正常」，极易误判为「只跑了一个店」
+- `seller_subscription_scraper.py`：主页无在售商品而 `continue` 的店铺记入 `skipped_sellers`；结尾新增 `[店铺汇总] 订阅 N 家 → 有商品入库 M 家 → 整店跳过 K 家` + 逐店原因
+- `seller_subscription_pacing.py`：`log_plan` 文案 `N 个卖家 × 最多 M 条/卖家` → `N 个卖家，每店最多 M 条（各店独立配额，互不占用）`，避免 `×` 被误读为配额共享
+- 补测：`test_scrape_reports_whole_skipped_seller_in_summary`（整店跳过的汇总输出回归）；`tests -k "seller_subscription or pacing"` **49 passed**
+
 ### fix(seller-subscription): reload_jobs 不再卸掉卖家订阅定时任务
 
 - `SchedulerService.reload_jobs` 只移除 `task_*` job，保留 `seller_subscriptions`

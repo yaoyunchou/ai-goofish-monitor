@@ -15,11 +15,13 @@ def _install_fake_scraper_module():
         return {}
 
     async def placeholder_browser(*_args, **_kwargs):
-        return None, None, None
+        return None
 
     async def placeholder_profile(*_args, **_kwargs):
         return {}
 
+    # spider_v2 会间接导入 seller_subscription_scraper / scraper_shop_datacompass，
+    # 它们从 src.scraper 取用的符号需一并补齐，否则 import 阶段即失败。
     fake_scraper.scrape_xianyu = placeholder_scrape
     fake_scraper.fetch_item_detail = placeholder_detail
     fake_scraper.launch_task_browser = placeholder_browser

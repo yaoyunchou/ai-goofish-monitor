@@ -191,6 +191,7 @@ async def _scrape_seller_ids(
     saved = 0
     skipped = 0
     seller_saved: dict[str, int] = {}
+    skipped_sellers: list[tuple[str, str]] = []  # (user_id, 原因)
     try:
         plans: list[SellerScrapePlan] = []
         print(
@@ -222,6 +223,9 @@ async def _scrape_seller_ids(
                 raw_count = len(profile.get("卖家发布的商品列表") or [])
                 print(
                     f"   卖家 {user_id} 未获取到在售商品（列表共 {raw_count} 条），跳过详情采集。"
+                )
+                skipped_sellers.append(
+                    (str(user_id), f"主页无在售商品（解析 {raw_count} 条）")
                 )
                 continue
 
@@ -380,6 +384,13 @@ async def _scrape_seller_ids(
         print(
             f"订阅任务完成：扫描 {scanned} → 详情 {detailed} → 入库 {saved} → 跳过 {skipped}"
         )
+        if skipped_sellers:
+            print(
+                f"[店铺汇总] 订阅 {len(seller_ids)} 家 → 有商品入库 "
+                f"{len(seller_saved)} 家 → 整店跳过 {len(skipped_sellers)} 家"
+            )
+            for seller_id, reason in skipped_sellers:
+                print(f"   · 跳过店铺 {seller_id}：{reason}")
         return saved
     finally:
         await browser.close()
