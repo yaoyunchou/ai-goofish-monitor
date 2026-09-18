@@ -17,3 +17,6 @@ prompts/
 price_history/
 data/
 .env.202608*
+.workbuddy-ai/
+.merge-backup-*/
+.merge-backup-pointer.txt
