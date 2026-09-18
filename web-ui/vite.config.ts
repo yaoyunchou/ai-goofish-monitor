@@ -26,6 +26,11 @@ function proxyWithBackendError(target: string): ProxyOptions {
   }
 }
 
+// 后端地址：默认 8000，可用 BACKEND_PORT 覆盖（本项目本地开发用 8001，避开端口占用）。
+const backendPort = process.env.BACKEND_PORT || '8000'
+const backendHttp = `http://127.0.0.1:${backendPort}`
+const backendWs = `ws://127.0.0.1:${backendPort}`
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [vue()],
@@ -40,10 +45,10 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': proxyWithBackendError('http://127.0.0.1:8000'),
-      '/auth': proxyWithBackendError('http://127.0.0.1:8000'),
+      '/api': proxyWithBackendError(backendHttp),
+      '/auth': proxyWithBackendError(backendHttp),
       '/ws': {
-        target: 'ws://127.0.0.1:8000',
+        target: backendWs,
         ws: true,
       },
     },
