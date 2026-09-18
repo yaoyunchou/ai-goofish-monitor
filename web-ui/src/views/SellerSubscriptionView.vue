@@ -1,17 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
   addSellerSubscription,
   deleteSellerSubscription,
-  getSellerMetricItems,
   listSellerSubscriptions,
-  runSellerSubscriptions,
   updateSellerSubscription,
-  updateSellerSubscriptionSchedule,
-  type SellerMetricItem,
   type SellerSubscription,
-  type SellerSubscriptionSchedule,
 } from '@/api/sellerSubscriptions'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -21,6 +17,13 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { toast } from '@/components/ui/toast'
+import { ChevronRight, Pencil, Plus, Search } from 'lucide-vue-next'
+import PaginationBar from '@/components/common/PaginationBar.vue'
+import { formatShanghaiTime } from '@/lib/datetime'
+import {
+  normalizeSellerSubscription,
+  normalizeSubscriptionEnabled,
+} from '@/lib/subscription'
 import {
   Dialog,
   DialogContent,
@@ -31,30 +34,67 @@ import {
 } from '@/components/ui/dialog'
 
 const { t } = useI18n()
+const router = useRouter()
 const subscriptions = ref<SellerSubscription[]>([])
-const schedule = ref<SellerSubscriptionSchedule | null>(null)
-const items = ref<SellerMetricItem[]>([])
-const sellerFilter = ref('')
+const search = ref('')
+const statusFilter = ref<'all' | 'enabled' | 'disabled'>('all')
+const sellerPage = ref(1)
+const sellerPageSize = ref(10)
 const isLoading = ref(false)
 const isSubmitting = ref(false)
 const error = ref('')
 const isAddDialogOpen = ref(false)
+const isEditDialogOpen = ref(false)
+const editingRow = ref<SellerSubscription | null>(null)
 const sellerUrlInput = ref('')
 const noteInput = ref('')
-const cronInput = ref('0 8 * * *')
-let pollTimer: ReturnType<typeof setInterval> | null = null
+const editNoteInput = ref('')
+const editEnabled = ref(true)
+const editFormKey = ref(0)
+const togglingIds = ref(new Set<number>())
 
-const selectedSeller = computed(() =>
-  subscriptions.value.find((item) => item.seller_user_id === sellerFilter.value) || null,
-)
+function findSubscription(id: number) {
+  return subscriptions.value.find((item) => item.id === id) ?? null
+}
+
+function applySubscriptionPatch(row: SellerSubscription, patch: Partial<SellerSubscription>) {
+  const index = subscriptions.value.findIndex((item) => item.id === row.id)
+  const merged = normalizeSellerSubscription({ ...row, ...patch })
+  if (index >= 0) {
+    subscriptions.value[index] = merged
+  }
+  Object.assign(row, merged)
+  return merged
+}
 
 const displayName = (row: SellerSubscription) =>
   row.profile_nickname || row.nickname || row.seller_user_id
 
-function formatTime(value?: string | null) {
-  if (!value) return '-'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
+const filteredSellers = computed(() => {
+  const keyword = search.value.trim().toLowerCase()
+  return subscriptions.value.filter((row) => {
+    if (statusFilter.value === 'enabled' && !row.enabled) return false
+    if (statusFilter.value === 'disabled' && row.enabled) return false
+    if (!keyword) return true
+    const name = displayName(row).toLowerCase()
+    const userId = (row.seller_user_id || '').toLowerCase()
+    const note = (row.note || '').toLowerCase()
+    return name.includes(keyword) || userId.includes(keyword) || note.includes(keyword)
+  })
+})
+
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(filteredSellers.value.length / sellerPageSize.value)),
+)
+
+const pagedSellers = computed(() => {
+  if (sellerPage.value > totalPages.value) sellerPage.value = totalPages.value
+  const start = (sellerPage.value - 1) * sellerPageSize.value
+  return filteredSellers.value.slice(start, start + sellerPageSize.value)
+})
+
+function onFilterChange() {
+  sellerPage.value = 1
 }
 
 async function load() {
@@ -62,11 +102,7 @@ async function load() {
   error.value = ''
   try {
     const overview = await listSellerSubscriptions()
-    subscriptions.value = overview.items || []
-    schedule.value = overview.schedule || null
-    if (schedule.value?.cron) cronInput.value = schedule.value.cron
-    const itemRes = await getSellerMetricItems(sellerFilter.value || undefined)
-    items.value = itemRes.items || []
+    subscriptions.value = (overview.items || []).map((item) => normalizeSellerSubscription(item))
   } catch (e) {
     error.value = (e as Error).message
   } finally {
@@ -97,36 +133,76 @@ async function handleAddSeller() {
   }
 }
 
-async function toggleEnabled(row: SellerSubscription) {
+async function setEnabled(row: SellerSubscription, enabled: boolean) {
+  const targetEnabled = normalizeSubscriptionEnabled(enabled)
+  if (normalizeSubscriptionEnabled(row.enabled) === targetEnabled || togglingIds.value.has(row.id)) {
+    return
+  }
+  togglingIds.value.add(row.id)
   try {
-    await updateSellerSubscription(row.id, { enabled: !row.enabled })
-    row.enabled = !row.enabled
+    const result = await updateSellerSubscription(row.id, { enabled: targetEnabled })
+    applySubscriptionPatch(row, result.item)
+    if (editingRow.value?.id === row.id) {
+      editEnabled.value = normalizeSubscriptionEnabled(result.item.enabled)
+      editFormKey.value += 1
+    }
+    toast({
+      title: targetEnabled
+        ? t('sellerSubscription.collectEnabledToast', { name: displayName(row) })
+        : t('sellerSubscription.collectDisabledToast', { name: displayName(row) }),
+      description: t('sellerSubscription.collectToggleHint'),
+    })
   } catch (e) {
     toast({ title: t('common.error'), description: (e as Error).message, variant: 'destructive' })
+  } finally {
+    togglingIds.value.delete(row.id)
   }
 }
 
-async function handleDelete(row: SellerSubscription) {
-  try {
-    await deleteSellerSubscription(row.id)
-    toast({ title: t('sellerSubscription.deleted') })
-    if (sellerFilter.value === row.seller_user_id) sellerFilter.value = ''
-    await load()
-  } catch (e) {
-    toast({ title: t('common.error'), description: (e as Error).message, variant: 'destructive' })
-  }
+function syncEditFormFromRow(row: SellerSubscription) {
+  editingRow.value = row
+  editNoteInput.value = row.note || ''
+  editEnabled.value = normalizeSubscriptionEnabled(row.enabled)
+  editFormKey.value += 1
 }
 
-async function saveSchedule() {
+function openEditDialog(row: SellerSubscription) {
+  if (togglingIds.value.has(row.id)) {
+    toast({
+      title: t('common.loading'),
+      description: t('sellerSubscription.collectToggleSaving'),
+    })
+    return
+  }
+  const latest = findSubscription(row.id) ?? row
+  syncEditFormFromRow(latest)
+  isEditDialogOpen.value = true
+}
+
+watch(isEditDialogOpen, async (open) => {
+  if (!open || !editingRow.value) return
+  await nextTick()
+  const latest = findSubscription(editingRow.value.id)
+  if (latest) syncEditFormFromRow(latest)
+})
+
+async function handleEditSeller() {
+  const row = editingRow.value
+  if (!row) return
   isSubmitting.value = true
   try {
-    const result = await updateSellerSubscriptionSchedule({
-      enabled: schedule.value?.enabled,
-      cron: cronInput.value.trim(),
-      item_limit: schedule.value?.item_limit ?? 100,
-    }) as { schedule: SellerSubscriptionSchedule }
-    schedule.value = result.schedule
-    toast({ title: t('sellerSubscription.scheduleSaved') })
+    const result = await updateSellerSubscription(row.id, {
+      note: editNoteInput.value.trim(),
+      enabled: editEnabled.value,
+    })
+    applySubscriptionPatch(row, result.item)
+    toast({
+      title: t('sellerSubscription.noteSaved'),
+      description: editEnabled.value
+        ? t('sellerSubscription.collectEnabledToast', { name: displayName(row) })
+        : t('sellerSubscription.collectDisabledToast', { name: displayName(row) }),
+    })
+    isEditDialogOpen.value = false
   } catch (e) {
     toast({ title: t('common.error'), description: (e as Error).message, variant: 'destructive' })
   } finally {
@@ -134,131 +210,69 @@ async function saveSchedule() {
   }
 }
 
-function stopPolling() {
-  if (pollTimer) {
-    clearInterval(pollTimer)
-    pollTimer = null
-  }
-}
-
-function startPolling() {
-  stopPolling()
-  pollTimer = setInterval(async () => {
-    try {
-      const overview = await listSellerSubscriptions()
-      schedule.value = overview.schedule || schedule.value
-      if (!schedule.value?.is_running) {
-        subscriptions.value = overview.items || subscriptions.value
-        const itemRes = await getSellerMetricItems(sellerFilter.value || undefined)
-        items.value = itemRes.items || []
-        stopPolling()
-        if (schedule.value?.last_run_ok) {
-          toast({
-            title: t('sellerSubscription.runFinished'),
-            description: schedule.value.last_run_summary || undefined,
-          })
-        } else if (schedule.value?.last_run_summary) {
-          toast({
-            title: t('sellerSubscription.runFailed'),
-            description: schedule.value.last_run_summary,
-            variant: 'destructive',
-          })
-        }
-      }
-    } catch {
-      // ignore transient poll errors
-    }
-  }, 5000)
-}
-
-async function handleRunNow() {
+async function handleDelete(row: SellerSubscription) {
   try {
-    const result = await runSellerSubscriptions() as { message?: string }
-    toast({
-      title: result.message || t('sellerSubscription.runStarted'),
-      description: t('sellerSubscription.runStartedHint'),
-    })
-    if (schedule.value) schedule.value.is_running = true
-    startPolling()
+    await deleteSellerSubscription(row.id)
+    toast({ title: t('sellerSubscription.deleted') })
+    onFilterChange()
+    await load()
   } catch (e) {
     toast({ title: t('common.error'), description: (e as Error).message, variant: 'destructive' })
   }
 }
 
+function goToDetail(row: SellerSubscription) {
+  router.push({ name: 'SellerDetail', params: { sellerUserId: row.seller_user_id } })
+}
+
 onMounted(load)
-onUnmounted(stopPolling)
 </script>
 
 <template>
   <div class="space-y-6">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-black text-slate-900">{{ t('sellerSubscription.title') }}</h1>
+        <h1 class="text-2xl font-black text-slate-900">{{ t('sellerSubscription.sellersTitle') }}</h1>
         <p class="text-sm text-slate-500">{{ t('sellerSubscription.description') }}</p>
       </div>
       <div class="flex flex-wrap gap-2">
         <Button variant="outline" @click="load">{{ t('common.refresh') }}</Button>
-        <Button variant="outline" :disabled="schedule?.is_running" @click="handleRunNow">
-          {{ schedule?.is_running ? t('sellerSubscription.running') : t('sellerSubscription.runNow') }}
+        <Button class="gap-1" @click="isAddDialogOpen = true">
+          <Plus class="h-4 w-4" />
+          {{ t('sellerSubscription.addSeller') }}
         </Button>
-        <Button @click="isAddDialogOpen = true">{{ t('sellerSubscription.addSeller') }}</Button>
       </div>
     </div>
-
-    <div
-      v-if="schedule?.last_run_summary"
-      class="rounded-xl border px-4 py-3 text-sm"
-      :class="schedule.last_run_ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-900'"
-    >
-      <p class="font-medium">
-        {{ schedule.last_run_ok ? t('sellerSubscription.lastRunOk') : t('sellerSubscription.lastRunFailed') }}
-        <span v-if="schedule.last_run_at" class="ml-2 font-normal opacity-80">
-          {{ formatTime(schedule.last_run_at) }}
-        </span>
-      </p>
-      <p class="mt-1">{{ schedule.last_run_summary }}</p>
-      <p v-if="schedule.last_run_saved" class="mt-1 text-xs opacity-80">
-        {{ t('sellerSubscription.lastRunSaved', { count: schedule.last_run_saved }) }}
-      </p>
-    </div>
-
-    <Card class="app-surface border-none">
-      <CardHeader>
-        <CardTitle class="text-base">{{ t('sellerSubscription.scheduleTitle') }}</CardTitle>
-      </CardHeader>
-      <CardContent class="grid gap-4 md:grid-cols-4">
-        <div class="space-y-2">
-          <Label>{{ t('sellerSubscription.cron') }}</Label>
-          <Input v-model="cronInput" placeholder="0 8 * * *" />
-        </div>
-        <div class="flex items-end gap-3">
-          <div class="space-y-2">
-            <Label>{{ t('sellerSubscription.scheduleEnabled') }}</Label>
-            <div class="flex h-10 items-center">
-              <Switch
-                :checked="schedule?.enabled ?? true"
-                @update:checked="(value: boolean) => schedule && (schedule.enabled = value)"
-              />
-            </div>
-          </div>
-        </div>
-        <div class="flex items-end">
-          <Button :disabled="isSubmitting" @click="saveSchedule">{{ t('common.save') }}</Button>
-        </div>
-        <p class="text-xs text-slate-500 md:col-span-4">
-          {{ t('sellerSubscription.scheduleHint', { limit: schedule?.item_limit ?? 100 }) }}
-        </p>
-      </CardContent>
-    </Card>
 
     <p v-if="error" class="text-sm text-rose-600">{{ error }}</p>
 
     <Card class="app-surface border-none">
-      <CardHeader class="flex flex-row items-center justify-between">
+      <CardHeader class="flex flex-row flex-wrap items-center justify-between gap-3">
         <CardTitle>{{ t('sellerSubscription.sellersTitle') }}</CardTitle>
-        <Badge variant="secondary">{{ subscriptions.length }}</Badge>
+        <Badge variant="secondary">{{ filteredSellers.length }} / {{ subscriptions.length }}</Badge>
       </CardHeader>
       <CardContent>
+        <p class="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
+          {{ t('sellerSubscription.sellersListHint') }}
+        </p>
+
+        <div class="mb-3 flex flex-wrap items-center gap-2">
+          <div class="relative">
+            <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              v-model="search"
+              class="h-9 w-64 pl-9"
+              :placeholder="t('sellerSubscription.searchSellers')"
+              @input="onFilterChange"
+            />
+          </div>
+          <select v-model="statusFilter" class="h-9 rounded-md border bg-white px-3 text-sm" @change="onFilterChange">
+            <option value="all">{{ t('sellerSubscription.filterAll') }}</option>
+            <option value="enabled">{{ t('common.enabled') }}</option>
+            <option value="disabled">{{ t('common.disabled') }}</option>
+          </select>
+        </div>
+
         <p v-if="isLoading" class="text-sm text-slate-500">{{ t('common.loading') }}</p>
         <div v-else class="overflow-x-auto">
           <table class="w-full text-sm">
@@ -270,91 +284,133 @@ onUnmounted(stopPolling)
                 <th>{{ t('sellerSubscription.followers') }}</th>
                 <th>{{ t('sellerSubscription.itemCount') }}</th>
                 <th>{{ t('sellerSubscription.colLastCaptured') }}</th>
-                <th>{{ t('sellerSubscription.colStatus') }}</th>
+                <th>{{ t('sellerSubscription.colCollect') }}</th>
                 <th class="text-right">{{ t('sellerSubscription.colActions') }}</th>
               </tr>
             </thead>
             <tbody>
               <tr
-                v-for="row in subscriptions"
+                v-for="row in pagedSellers"
                 :key="row.id"
-                class="border-t border-slate-100"
-                :class="sellerFilter === row.seller_user_id ? 'bg-slate-50' : ''"
+                class="cursor-pointer border-t border-slate-100 hover:bg-slate-50"
+                @click="goToDetail(row)"
               >
                 <td class="py-2 font-medium text-slate-800">
-                  <button class="text-left hover:text-primary" @click="sellerFilter = row.seller_user_id; load()">
-                    {{ displayName(row) }}
-                  </button>
+                  <div class="flex items-center gap-2">
+                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-black text-primary">
+                      {{ displayName(row).slice(0, 1).toUpperCase() }}
+                    </div>
+                    <div class="min-w-0">
+                      <p class="truncate">{{ displayName(row) }}</p>
+                      <p v-if="row.note" class="truncate text-xs text-slate-400">{{ row.note }}</p>
+                    </div>
+                  </div>
                 </td>
                 <td class="font-mono text-xs text-slate-500">{{ row.seller_user_id }}</td>
                 <td>{{ row.shop_level || '-' }}</td>
                 <td>{{ row.followers ?? '-' }}</td>
                 <td>{{ row.item_count ?? '-' }}</td>
-                <td>{{ formatTime(row.last_captured_at || row.profile_captured_at) }}</td>
-                <td>
-                  <Badge :variant="row.enabled ? 'default' : 'secondary'">
-                    {{ row.enabled ? t('common.enabled') : t('common.disabled') }}
-                  </Badge>
+                <td class="whitespace-nowrap text-xs text-slate-500">
+                  {{ formatShanghaiTime(row.last_captured_at || row.profile_captured_at) }}
                 </td>
-                <td class="space-x-2 text-right">
-                  <Button size="sm" variant="outline" @click="toggleEnabled(row)">
-                    {{ row.enabled ? t('common.disabled') : t('common.enabled') }}
-                  </Button>
-                  <Button size="sm" variant="destructive" @click="handleDelete(row)">
-                    {{ t('common.delete') }}
-                  </Button>
+                <td @click.stop>
+                  <div
+                    class="flex max-w-[11rem] items-center gap-2"
+                    :title="t('sellerSubscription.collectToggleHint')"
+                  >
+                    <Switch
+                      :model-value="normalizeSubscriptionEnabled(row.enabled)"
+                      :disabled="togglingIds.has(row.id)"
+                      @update:model-value="(value: boolean) => setEnabled(row, value)"
+                    />
+                    <div class="min-w-0">
+                      <p class="text-xs font-medium text-slate-700">
+                        {{
+                          row.enabled
+                            ? t('sellerSubscription.collectEnabled')
+                            : t('sellerSubscription.collectDisabled')
+                        }}
+                      </p>
+                      <p class="truncate text-[11px] text-slate-400">
+                        {{ t('sellerSubscription.collectToggleLabel') }}
+                      </p>
+                    </div>
+                  </div>
+                </td>
+                <td class="text-right" @click.stop>
+                  <div class="flex items-center justify-end gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      class="h-8 gap-1 px-2"
+                      :disabled="togglingIds.has(row.id)"
+                      @click="openEditDialog(row)"
+                    >
+                      <Pencil class="h-3.5 w-3.5" />
+                      {{ t('common.edit') }}
+                    </Button>
+                    <Button size="sm" variant="ghost" class="h-8 w-8 p-0" @click="goToDetail(row)">
+                      <ChevronRight class="h-4 w-4" />
+                    </Button>
+                    <Button size="sm" variant="destructive" @click="handleDelete(row)">
+                      {{ t('common.delete') }}
+                    </Button>
+                  </div>
                 </td>
               </tr>
             </tbody>
           </table>
-          <p v-if="!subscriptions.length" class="py-8 text-center text-slate-400">
-            {{ t('sellerSubscription.emptySellers') }}
+          <p v-if="!pagedSellers.length" class="py-8 text-center text-slate-400">
+            {{ subscriptions.length ? t('sellerSubscription.noMatch') : t('sellerSubscription.emptySellers') }}
           </p>
+        </div>
+
+        <div v-if="filteredSellers.length > sellerPageSize" class="mt-4 border-t border-slate-100 pt-3">
+          <PaginationBar
+            :page="sellerPage"
+            :page-size="sellerPageSize"
+            :total="filteredSellers.length"
+            @update:page="(page: number) => (sellerPage = page)"
+            @update:page-size="(size: number) => { sellerPageSize = size; sellerPage = 1 }"
+          />
         </div>
       </CardContent>
     </Card>
 
-    <Card class="app-surface border-none">
-      <CardHeader class="flex flex-row items-center justify-between gap-3">
-        <CardTitle>{{ t('sellerSubscription.itemsTitle') }}</CardTitle>
-        <select v-model="sellerFilter" class="h-9 rounded-md border px-3 text-sm" @change="load">
-          <option value="">{{ t('sellerSubscription.allSellers') }}</option>
-          <option v-for="row in subscriptions" :key="row.id" :value="row.seller_user_id">
-            {{ displayName(row) }}
-          </option>
-        </select>
-      </CardHeader>
-      <CardContent>
-        <p v-if="selectedSeller" class="mb-3 text-xs text-slate-500">
-          {{ t('sellerSubscription.filteredBy', { seller: displayName(selectedSeller) }) }}
-        </p>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="text-left text-slate-500">
-                <th class="py-2">{{ t('sellerSubscription.colTitle') }}</th>
-                <th>{{ t('sellerSubscription.colPrice') }}</th>
-                <th>{{ t('sellerSubscription.colWant') }}</th>
-                <th>{{ t('sellerSubscription.colView') }}</th>
-                <th>{{ t('sellerSubscription.colSeller') }}</th>
-                <th>{{ t('sellerSubscription.colSnapshot') }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="item in items" :key="`${item.item_id}-${item.snapshot_time}`" class="border-t border-slate-100">
-                <td class="py-2 font-medium text-slate-800">{{ item.title || item.item_id }}</td>
-                <td>{{ item.price ?? '-' }}</td>
-                <td>{{ item.want_count ?? '-' }}</td>
-                <td>{{ item.view_count ?? '-' }}</td>
-                <td>{{ item.seller_user_id }}</td>
-                <td>{{ formatTime(item.snapshot_time) }}</td>
-              </tr>
-            </tbody>
-          </table>
-          <p v-if="!items.length" class="py-8 text-center text-slate-400">{{ t('sellerSubscription.empty') }}</p>
+    <Dialog v-model:open="isEditDialogOpen">
+      <DialogContent class="sm:max-w-[520px]">
+        <DialogHeader>
+          <DialogTitle>{{ t('sellerSubscription.editSeller') }}</DialogTitle>
+          <DialogDescription>{{ t('sellerSubscription.editSellerHint') }}</DialogDescription>
+        </DialogHeader>
+        <div v-if="editingRow" class="space-y-4 py-2">
+          <div class="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            {{ displayName(editingRow) }}
+            <span class="ml-2 font-mono text-xs text-slate-400">{{ editingRow.seller_user_id }}</span>
+          </div>
+          <div class="space-y-2">
+            <Label>{{ t('sellerSubscription.note') }}</Label>
+            <Input v-model="editNoteInput" :placeholder="t('sellerSubscription.notePlaceholder')" />
+          </div>
+          <div class="flex items-center justify-between gap-4 rounded-xl border px-4 py-3">
+            <div>
+              <p class="text-sm font-medium text-slate-800">{{ t('sellerSubscription.collectToggleLabel') }}</p>
+              <p class="mt-0.5 text-xs text-slate-500">{{ t('sellerSubscription.collectToggleHint') }}</p>
+            </div>
+            <Switch
+              :key="`edit-enabled-${editFormKey}`"
+              v-model="editEnabled"
+            />
+          </div>
         </div>
-      </CardContent>
-    </Card>
+        <DialogFooter>
+          <Button variant="outline" @click="isEditDialogOpen = false">{{ t('common.cancel') }}</Button>
+          <Button :disabled="isSubmitting" @click="handleEditSeller">
+            {{ isSubmitting ? t('common.loading') : t('common.save') }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     <Dialog v-model:open="isAddDialogOpen">
       <DialogContent class="sm:max-w-[520px]">

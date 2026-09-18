@@ -118,6 +118,9 @@ class FakeSchedulerService:
     def get_next_run_time(self, task_id: int):
         return self.next_run_times.get(task_id)
 
+    def get_seller_subscription_next_run_time(self):
+        return getattr(self, "subscription_next_run_time", None)
+
 
 @pytest.fixture()
 def api_context(tmp_path):

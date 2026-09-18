@@ -5,15 +5,33 @@ import sys
 import types
 
 
-def test_cli_runs_single_task_with_prompt(tmp_path, load_json_fixture, monkeypatch):
+def _install_fake_scraper_module():
     fake_scraper = types.ModuleType("src.scraper")
 
     async def placeholder_scrape(task_config, debug_limit):
         return 0
 
+    async def placeholder_detail(*_args, **_kwargs):
+        return {}
+
+    async def placeholder_browser(*_args, **_kwargs):
+        return None, None, None
+
+    async def placeholder_profile(*_args, **_kwargs):
+        return {}
+
     fake_scraper.scrape_xianyu = placeholder_scrape
+    fake_scraper.fetch_item_detail = placeholder_detail
+    fake_scraper.launch_task_browser = placeholder_browser
+    fake_scraper.scrape_user_profile = placeholder_profile
+    return fake_scraper
+
+
+def test_cli_runs_single_task_with_prompt(tmp_path, load_json_fixture, monkeypatch):
+    fake_scraper = _install_fake_scraper_module()
     monkeypatch.setitem(sys.modules, "src.scraper", fake_scraper)
     sys.modules.pop("spider_v2", None)
+    sys.modules.pop("src.seller_subscription_scraper", None)
 
     spider_v2 = importlib.import_module("spider_v2")
     config_data = load_json_fixture("config.sample.json")
@@ -57,14 +75,10 @@ def test_cli_runs_single_task_with_prompt(tmp_path, load_json_fixture, monkeypat
 
 
 def test_cli_runs_keyword_mode_without_prompt_files(tmp_path, load_json_fixture, monkeypatch):
-    fake_scraper = types.ModuleType("src.scraper")
-
-    async def placeholder_scrape(task_config, debug_limit):
-        return 0
-
-    fake_scraper.scrape_xianyu = placeholder_scrape
+    fake_scraper = _install_fake_scraper_module()
     monkeypatch.setitem(sys.modules, "src.scraper", fake_scraper)
     sys.modules.pop("spider_v2", None)
+    sys.modules.pop("src.seller_subscription_scraper", None)
 
     spider_v2 = importlib.import_module("spider_v2")
     config_data = load_json_fixture("config.sample.json")

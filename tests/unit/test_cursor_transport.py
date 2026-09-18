@@ -102,7 +102,8 @@ def test_effective_cursor_runtime_auto_cloud_in_cursor_agent(monkeypatch):
 
 def test_effective_cursor_runtime_respects_explicit_local(monkeypatch):
     monkeypatch.setenv("CURSOR_AGENT", "1")
-    settings = AISettings(cursor_runtime="local")
+    monkeypatch.delenv("CURSOR_RUNTIME", raising=False)
+    settings = AISettings.model_construct(cursor_runtime="local")
     assert settings.effective_cursor_runtime() == "local"
 
 

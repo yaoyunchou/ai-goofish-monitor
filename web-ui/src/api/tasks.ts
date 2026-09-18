@@ -32,12 +32,12 @@ export async function createTask(data: TaskGenerateRequest): Promise<TaskCreateR
 }
 
 export async function getTaskGenerationJob(jobId: string): Promise<TaskGenerationJob> {
-  const result = await http(`/api/tasks/generate-jobs/${jobId}`)
+  const result = await http<{ job: TaskGenerationJob }>(`/api/tasks/generate-jobs/${jobId}`)
   return result.job
 }
 
 export async function updateTask(taskId: number, data: TaskUpdate): Promise<Task> {
-  const result = await http(`/api/tasks/${taskId}`, {
+  const result = await http<{ task: Task }>(`/api/tasks/${taskId}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',

@@ -19,9 +19,13 @@ class _FakeSchedulerService:
         self.started = False
         self.stopped = False
         self.reload_payload = None
+        self.subscription_schedule = None
 
     async def reload_jobs(self, tasks):
         self.reload_payload = list(tasks)
+
+    async def reload_seller_subscription_job(self, schedule):
+        self.subscription_schedule = schedule
 
     def start(self):
         self.started = True
@@ -47,6 +51,18 @@ def test_lifespan_cleans_task_logs_on_startup(monkeypatch):
     monkeypatch.setattr(app_module, "process_service", fake_process)
     monkeypatch.setattr(app_module, "TaskService", _FakeTaskService)
     monkeypatch.setattr(app_module, "create_task_repository", lambda: object())
+    async def _no_migrate():
+        return 0
+
+    async def _noop_running(_value):
+        return {}
+
+    async def _empty_schedule():
+        return {}
+
+    monkeypatch.setattr(app_module, "migrate_legacy_subscription_tasks", _no_migrate)
+    monkeypatch.setattr(app_module, "set_subscription_running", _noop_running)
+    monkeypatch.setattr(app_module, "get_schedule", _empty_schedule)
     monkeypatch.setattr(app_module, "bootstrap_storage", lambda: called.setdefault("bootstrapped", True))
     monkeypatch.setattr(
         app_module,

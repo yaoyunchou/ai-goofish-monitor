@@ -29,3 +29,34 @@ def test_shuffle_items_changes_order_but_keeps_length():
     shuffled = SubscriptionPacing.shuffle_items(items)
     assert len(shuffled) == 5
     assert {item["商品ID"] for item in shuffled} == {str(i) for i in range(5)}
+
+
+def test_prioritize_missing_today_puts_uncovered_first():
+    items = [
+        {"商品ID": "a"},
+        {"商品ID": "b"},
+        {"商品ID": "c"},
+    ]
+    ordered = SubscriptionPacing.prioritize_missing_today(items, {"b"})
+    assert ordered[0]["商品ID"] in {"a", "c"}
+    assert ordered[-1]["商品ID"] == "b"
+
+
+def test_prioritize_sellers_by_missing_puts_more_missing_first():
+    plans = [
+        {"user_id": "old-seller", "missing_count": 2, "never_captured": False},
+        {"user_id": "new-seller", "missing_count": 100, "never_captured": False},
+    ]
+    ordered = SubscriptionPacing.prioritize_sellers_by_missing(plans)
+    assert ordered[0]["user_id"] == "new-seller"
+    assert ordered[1]["user_id"] == "old-seller"
+
+
+def test_prioritize_sellers_never_captured_beats_missing_count():
+    plans = [
+        {"user_id": "old-seller", "missing_count": 80, "never_captured": False},
+        {"user_id": "new-seller", "missing_count": 10, "never_captured": True},
+    ]
+    ordered = SubscriptionPacing.prioritize_sellers_by_missing(plans)
+    assert ordered[0]["user_id"] == "new-seller"
+    assert ordered[1]["user_id"] == "old-seller"

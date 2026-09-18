@@ -236,6 +236,26 @@ class SubscriptionPacing:
 
 
 
+    async def before_list_alignment(self, seller_index: int) -> None:
+
+        """对齐商品列表时只做短预热，不套用切换卖家的长冷却。"""
+
+        if seller_index <= 0:
+
+            return
+
+        print("   [策略] 对齐下一店铺商品列表…")
+
+        await random_sleep(
+
+            self.config.profile_warmup_min,
+
+            self.config.profile_warmup_max,
+
+        )
+
+
+
     async def before_detail(self, item_index: int) -> None:
 
         if item_index > 0:
@@ -291,5 +311,62 @@ class SubscriptionPacing:
         random.shuffle(shuffled)
 
         return shuffled
+
+
+
+    @staticmethod
+
+    def prioritize_missing_today(items: list[dict], covered_item_ids: set[str]) -> list[dict]:
+
+        """今日尚无日指标的商品优先，组内仍随机打乱。"""
+
+        missing: list[dict] = []
+
+        covered: list[dict] = []
+
+        for item in items:
+
+            item_id = str(item.get("商品ID") or item.get("item_id") or "")
+
+            if item_id and item_id in covered_item_ids:
+
+                covered.append(item)
+
+            else:
+
+                missing.append(item)
+
+        random.shuffle(missing)
+
+        random.shuffle(covered)
+
+        return missing + covered
+
+
+    @staticmethod
+
+    def prioritize_sellers_by_missing(plans: list[dict]) -> list[dict]:
+
+        """从未采过的店铺最前，其次今日未采集条数多的卖家。"""
+
+        ordered = list(plans)
+
+        random.shuffle(ordered)
+
+        ordered.sort(
+
+            key=lambda plan: (
+
+                0 if plan.get("never_captured") else 1,
+
+                -int(plan.get("missing_count") or 0),
+
+                str(plan.get("user_id") or ""),
+
+            )
+
+        )
+
+        return ordered
 
 

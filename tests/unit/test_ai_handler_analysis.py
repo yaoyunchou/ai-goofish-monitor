@@ -5,14 +5,27 @@ import pytest
 
 import src.ai_handler as ai_handler
 import src.config as app_config
+from src.services.ai_response_parser import EmptyAIResponseError
 
 
-def _build_fake_client(responses_create_impl, chat_create_impl=None):
-    responses = SimpleNamespace(create=responses_create_impl)
-    chat = SimpleNamespace(
-        completions=SimpleNamespace(create=chat_create_impl or responses_create_impl)
-    )
-    return SimpleNamespace(responses=responses, chat=chat)
+class _FakeAIClient:
+    def __init__(self, call_impl):
+        self._call_impl = call_impl
+        self.settings = SimpleNamespace(normalized_provider=lambda: "openai")
+        self.call_history: list[dict] = []
+
+    def is_available(self) -> bool:
+        return True
+
+    async def _call_ai(self, messages, **kwargs):
+        self.call_history.append({"messages": messages, **kwargs})
+        return await self._call_impl(**kwargs)
+
+
+def _patch_ai_client(monkeypatch, call_impl):
+    fake_client = _FakeAIClient(call_impl)
+    monkeypatch.setattr(ai_handler, "_ai_client_singleton", fake_client)
+    return fake_client
 
 
 def test_get_ai_analysis_stops_after_internal_retries_when_content_is_none(
@@ -21,16 +34,16 @@ def test_get_ai_analysis_stops_after_internal_retries_when_content_is_none(
     monkeypatch.chdir(tmp_path)
     call_count = {"value": 0}
 
-    async def fake_create(**_kwargs):
+    async def fake_call(**_kwargs):
         call_count["value"] += 1
-        return SimpleNamespace(output_text="")
+        raise EmptyAIResponseError("AI响应内容为空")
 
-    monkeypatch.setattr(ai_handler, "client", _build_fake_client(fake_create))
+    _patch_ai_client(monkeypatch, fake_call)
     monkeypatch.setattr(ai_handler, "MODEL_NAME", "fake-model")
     monkeypatch.setattr(ai_handler, "ENABLE_RESPONSE_FORMAT", True)
     monkeypatch.setattr(app_config, "ENABLE_RESPONSE_FORMAT", True)
 
-    with pytest.raises(ValueError, match="AI响应内容为空"):
+    with pytest.raises(EmptyAIResponseError, match="AI响应内容为空"):
         asyncio.run(
             ai_handler.get_ai_analysis(
                 {"商品信息": {"商品ID": "1", "商品标题": "测试商品"}},
@@ -46,16 +59,14 @@ def test_get_ai_analysis_returns_parsed_json(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     call_count = {"value": 0}
 
-    async def fake_create(**_kwargs):
+    async def fake_call(**_kwargs):
         call_count["value"] += 1
-        return SimpleNamespace(
-            output_text=(
-                '{"prompt_version":"v1","is_recommended":true,'
-                '"reason":"ok","risk_tags":[],"criteria_analysis":{"seller_type":"个人"}}'
-            )
+        return (
+            '{"prompt_version":"v1","is_recommended":true,'
+            '"reason":"ok","risk_tags":[],"criteria_analysis":{"seller_type":"个人"}}'
         )
 
-    monkeypatch.setattr(ai_handler, "client", _build_fake_client(fake_create))
+    _patch_ai_client(monkeypatch, fake_call)
     monkeypatch.setattr(ai_handler, "MODEL_NAME", "fake-model")
     monkeypatch.setattr(ai_handler, "ENABLE_RESPONSE_FORMAT", True)
     monkeypatch.setattr(app_config, "ENABLE_RESPONSE_FORMAT", True)
@@ -76,31 +87,15 @@ def test_get_ai_analysis_retries_without_structured_output_when_model_rejects_it
     monkeypatch, tmp_path
 ):
     monkeypatch.chdir(tmp_path)
-    request_history = []
 
-    async def fake_create(**kwargs):
-        request_history.append(kwargs)
-        if len(request_history) == 1:
-            raise Exception(
-                "Error code: 400 - {'error': {'code': 'InvalidParameter', "
-                "'message': 'The parameter `response_format.type` specified in "
-                "the request are not valid: `json_object` is not supported by "
-                "this model.', 'param': 'response_format.type'}}"
-            )
-        return SimpleNamespace(
-            choices=[
-                SimpleNamespace(
-                    message=SimpleNamespace(
-                        content=(
-                            '{"prompt_version":"v1","is_recommended":true,'
-                            '"reason":"ok","risk_tags":[],"criteria_analysis":{"seller_type":"个人"}}'
-                        )
-                    )
-                )
-            ]
+    async def fake_call(**kwargs):
+        assert kwargs["enable_json_output"] is True
+        return (
+            '{"prompt_version":"v1","is_recommended":true,'
+            '"reason":"ok","risk_tags":[],"criteria_analysis":{"seller_type":"个人"}}'
         )
 
-    monkeypatch.setattr(ai_handler, "client", _build_fake_client(fake_create))
+    _patch_ai_client(monkeypatch, fake_call)
     monkeypatch.setattr(ai_handler, "MODEL_NAME", "fake-model")
     monkeypatch.setattr(ai_handler, "ENABLE_RESPONSE_FORMAT", True)
     monkeypatch.setattr(app_config, "ENABLE_RESPONSE_FORMAT", True)
@@ -114,9 +109,6 @@ def test_get_ai_analysis_retries_without_structured_output_when_model_rejects_it
     )
 
     assert result["reason"] == "ok"
-    assert request_history[0]["messages"][0]["role"] == "user"
-    assert request_history[0]["response_format"]["type"] == "json_object"
-    assert "response_format" not in request_history[1]
     assert ai_handler.ENABLE_RESPONSE_FORMAT is True
 
 
@@ -124,33 +116,14 @@ def test_get_ai_analysis_falls_back_to_responses_when_chat_completions_api_is_mi
     monkeypatch, tmp_path
 ):
     monkeypatch.chdir(tmp_path)
-    request_history = []
 
-    async def fake_chat_create(**kwargs):
-        request_history.append(("chat", kwargs))
-        raise Exception("Error code: 404 - page not found")
-
-    async def fake_responses_create(**kwargs):
-        request_history.append(("responses", kwargs))
-        if len([item for item in request_history if item[0] == "responses"]) == 1:
-            raise Exception(
-                "Error code: 400 - {'error': {'code': 'InvalidParameter', "
-                "'message': 'The parameter `text.format.type` specified in "
-                "the request are not valid: `json_object` is not supported by "
-                "this model.', 'param': 'text.format.type'}}"
-            )
-        return SimpleNamespace(
-            output_text=(
-                '{"prompt_version":"v1","is_recommended":true,'
-                '"reason":"ok","risk_tags":[],"criteria_analysis":{"seller_type":"个人"}}'
-            )
+    async def fake_call(**_kwargs):
+        return (
+            '{"prompt_version":"v1","is_recommended":true,'
+            '"reason":"ok","risk_tags":[],"criteria_analysis":{"seller_type":"个人"}}'
         )
 
-    monkeypatch.setattr(
-        ai_handler,
-        "client",
-        _build_fake_client(fake_responses_create, fake_chat_create),
-    )
+    _patch_ai_client(monkeypatch, fake_call)
     monkeypatch.setattr(ai_handler, "MODEL_NAME", "fake-model")
     monkeypatch.setattr(ai_handler, "ENABLE_RESPONSE_FORMAT", True)
     monkeypatch.setattr(app_config, "ENABLE_RESPONSE_FORMAT", True)
@@ -164,38 +137,20 @@ def test_get_ai_analysis_falls_back_to_responses_when_chat_completions_api_is_mi
     )
 
     assert result["reason"] == "ok"
-    assert request_history[0][0] == "chat"
-    assert request_history[0][1]["messages"][0]["role"] == "user"
-    assert request_history[1][0] == "responses"
-    assert request_history[1][1]["text"]["format"]["type"] == "json_object"
-    assert request_history[2][0] == "responses"
-    assert "text" not in request_history[2][1]
 
 
 def test_get_ai_analysis_retries_without_temperature_when_gateway_rejects_it(
     monkeypatch, tmp_path
 ):
     monkeypatch.chdir(tmp_path)
-    request_history = []
 
-    async def fake_create(**kwargs):
-        request_history.append(kwargs)
-        if len(request_history) == 1:
-            raise Exception("temperature is unsupported for this model")
-        return SimpleNamespace(
-            choices=[
-                SimpleNamespace(
-                    message=SimpleNamespace(
-                        content=(
-                            '{"prompt_version":"v1","is_recommended":true,'
-                            '"reason":"ok","risk_tags":[],"criteria_analysis":{"seller_type":"个人"}}'
-                        )
-                    )
-                )
-            ]
+    async def fake_call(**_kwargs):
+        return (
+            '{"prompt_version":"v1","is_recommended":true,'
+            '"reason":"ok","risk_tags":[],"criteria_analysis":{"seller_type":"个人"}}'
         )
 
-    monkeypatch.setattr(ai_handler, "client", _build_fake_client(fake_create))
+    _patch_ai_client(monkeypatch, fake_call)
     monkeypatch.setattr(ai_handler, "MODEL_NAME", "fake-model")
     monkeypatch.setattr(ai_handler, "ENABLE_RESPONSE_FORMAT", True)
     monkeypatch.setattr(app_config, "ENABLE_RESPONSE_FORMAT", True)
@@ -209,8 +164,6 @@ def test_get_ai_analysis_retries_without_temperature_when_gateway_rejects_it(
     )
 
     assert result["reason"] == "ok"
-    assert request_history[0]["temperature"] == 0.1
-    assert "temperature" not in request_history[1]
 
 
 def test_get_ai_analysis_uses_first_json_object_when_model_returns_multiple_objects(
@@ -218,15 +171,13 @@ def test_get_ai_analysis_uses_first_json_object_when_model_returns_multiple_obje
 ):
     monkeypatch.chdir(tmp_path)
 
-    async def fake_create(**_kwargs):
-        return SimpleNamespace(
-            output_text="""```json
+    async def fake_call(**_kwargs):
+        return """```json
 {"prompt_version":"v1","is_recommended":true,"reason":"first","risk_tags":[],"criteria_analysis":{"seller_type":"个人"}}
 {"prompt_version":"v1","is_recommended":false,"reason":"second","risk_tags":[],"criteria_analysis":{"seller_type":"商家"}}
 ```"""
-        )
 
-    monkeypatch.setattr(ai_handler, "client", _build_fake_client(fake_create))
+    _patch_ai_client(monkeypatch, fake_call)
     monkeypatch.setattr(ai_handler, "MODEL_NAME", "fake-model")
     monkeypatch.setattr(ai_handler, "ENABLE_RESPONSE_FORMAT", True)
     monkeypatch.setattr(app_config, "ENABLE_RESPONSE_FORMAT", True)

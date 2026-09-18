@@ -92,10 +92,37 @@ def has_want_and_view(item_data: dict | None) -> bool:
 
 
 def parse_metric_int(value) -> int | None:
+    """解析想要/浏览/粉丝等计数，支持 1.1w、1.2万、3k 等闲鱼常见缩写。"""
     if not is_valid_metric_value(value):
         return None
-    text = str(value).strip().replace(",", "")
+    text = str(value).strip().replace(",", "").replace("，", "")
+    lowered = text.lower()
+    multiplier = 1
+    if lowered.endswith("万"):
+        multiplier = 10000
+        text = text[:-1]
+    elif lowered.endswith("w"):
+        multiplier = 10000
+        text = text[:-1]
+    elif lowered.endswith("k"):
+        multiplier = 1000
+        text = text[:-1]
+    text = text.strip()
+    if not text:
+        return None
     try:
-        return int(float(text))
+        return int(float(text) * multiplier)
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_praise_ratio(value) -> float | None:
+    if value is None:
+        return None
+    text = str(value).strip().replace("%", "")
+    if not text or text in _INVALID_METRIC_TOKENS:
+        return None
+    try:
+        return float(text)
     except (TypeError, ValueError):
         return None

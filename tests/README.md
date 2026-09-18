@@ -1,103 +1,139 @@
 # 测试指南
 
-本项目使用 pytest 作为测试框架。以下是运行测试的指南。
+本项目使用 **pytest**。完整功能说明见 [docs/features.md §13](../docs/features.md#十三测试体系)。
 
-## 安装依赖
+## 概览（2026-09-17，阶段四完成）
 
-在运行测试之前，请确保已安装所有开发依赖项：
+| 指标 | 数量 |
+|------|------|
+| 可收集用例 | **186**（含 3 个 live，默认 skip） |
+| 离线基线 | **183 passed, 3 skipped** |
+| 单元测试 | `tests/unit/`（约 43 个文件） |
+| 集成测试 | `tests/integration/`（11 个文件） |
+| Live 冒烟 | `tests/live/`（需 `RUN_LIVE_TESTS=1`） |
+| 前端单测 | `web-ui/` Vitest smoke（**9** 用例，`npm test`） |
+
+## 环境准备
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## 运行测试
-
-### 运行所有测试
+## 运行命令
 
 ```bash
-pytest
+# 推荐：全量离线测试
+python -m pytest -q
+
+# 覆盖率
+python -m pytest --cov=src
+
+# 单文件 / 单函数
+python -m pytest tests/integration/test_api_tasks.py
+python -m pytest tests/unit/test_utils.py::test_safe_get_nested_and_default
 ```
 
-### 运行特定测试文件
+### Windows 注意
+
+若出现 `collected 0 items` 或 capture 相关错误，使用：
 
 ```bash
-pytest tests/integration/test_api_tasks.py
+python -m pytest -q --capture=no
 ```
 
-### 运行特定测试函数
+`pyproject.toml` 已默认 `--capture=no`。第三方插件冲突时可设：
 
 ```bash
-pytest tests/unit/test_utils.py::test_safe_get_nested_and_default
+$env:PYTEST_DISABLE_PLUGIN_AUTOLOAD="1"
+python -m pytest -q
 ```
 
-### 生成覆盖率报告
+### CI
 
-```bash
-coverage run -m pytest
-coverage report
-coverage html  # 生成 HTML 报告
-```
+| 工作流 | 内容 |
+|--------|------|
+| `.github/workflows/pytest.yml` | 后端 pytest（push/PR） |
+| `.github/workflows/web-ui.yml` | 前端 Vitest + `npm run build`（`web-ui/` 变更时） |
 
-## 测试文件结构
+前端本地测试：`cd web-ui && npm test`。详见 [web-ui/README.md](../web-ui/README.md)。
+
+## 目录结构
 
 ```
 tests/
-├── __init__.py
-├── conftest.py              # 共享 fixtures（API/CLI/样例数据）
-├── fixtures/                # 贴近真实的样例数据（搜索/用户/评价/任务配置）
-│   ├── config.sample.json
-│   ├── ratings.json
-│   ├── search_results.json
-│   ├── state.sample.json
-│   ├── user_head.json
-│   └── user_items.json
-├── integration/             # 关键链路集成测试（API/CLI/解析器）
-│   ├── test_api_tasks.py
-│   ├── test_cli_spider.py
-│   └── test_pipeline_parse.py
-└── unit/                    # 核心纯函数单元测试
-    ├── test_domain_task.py
-    └── test_utils.py
+├── conftest.py              # 共享 fixtures（API Client、内存仓储、样例任务）
+├── fixtures/                # 搜索/用户/评价/任务配置/店铺罗盘 datacompass 样例 JSON
+├── fakes/
+│   └── memory_task_repository.py
+├── unit/                    # 单元测试（AI、解析、关键词、卖家订阅、店铺罗盘等）
+├── integration/             # API / CLI / 解析管道集成测试
+├── live/                    # 真实流量冒烟（默认 skip）
+├── test_failure_guard.py
+└── test_frontend_build_paths.py
 ```
 
-## 编写新测试
+### 集成测试覆盖的 API
 
-1. 新增测试放在 `tests/integration/` 或 `tests/unit/`
-2. 文件名以 `test_` 开头，函数名以 `test_` 开头
-3. 测试采用同步执行（不依赖 pytest-asyncio）
-4. 外部依赖（Playwright/AI/通知/网络）统一 mock
-5. 使用 `tests/fixtures/` 的样例数据，避免依赖真实网络
+| 文件 | 模块 |
+|------|------|
+| `test_api_tasks.py` | `/api/tasks` |
+| `test_api_results.py` | `/api/results` |
+| `test_api_settings.py` | `/api/settings` |
+| `test_api_dashboard.py` | `/api/dashboard` |
+| `test_api_seller_subscriptions.py` | `/api/seller-subscriptions` |
+| `test_api_shop_analytics.py` | `/api/shop-analytics`（dashboard + 旧 overview） |
+| `test_api_accounts.py` | `/api/accounts` |
+| `test_api_collections.py` | `/api/collections` |
+| `test_api_logs.py` | `/api/logs` |
+| `test_cli_spider.py` | `spider_v2.py` |
+| `test_pipeline_parse.py` | `parsers.py` |
 
-## 注意事项
+### 阶段三新增单测
 
-1. 目标是离线可跑且稳定复现
-2. 集成测试优先覆盖真实运行链路（API、CLI、解析器）
-3. 如需新增真实场景样例，统一补充到 `tests/fixtures/`
+| 文件 | 覆盖 |
+|------|------|
+| `test_scheduler_service.py` | `reload_seller_subscription_job` 等调度逻辑 |
+| `test_scraper_shop_datacompass.py` | 店铺罗盘 datacompass fixture 解析与 persist |
+| `test_seller_subscription_scraper.py` | 卖家订阅入库过滤（想要+浏览量）、空配置跳过 |
+| `test_seller_item_daily_storage.py` | 日级 UPSERT（同日覆盖 raw）、Asia/Shanghai snapshot_day |
+| `test_shop_analytics_dashboard.py` | 订阅看板口径：空心日 null、7d 不跨日求和、SQL GROUP BY |
 
-## Live smoke（真实冒烟测试）
+**尚未覆盖的 API**：`prompts`、`login_state`、`websocket`。
 
-- 目录：`tests/live/`
-- 默认关闭；仅当显式设置 `RUN_LIVE_TESTS=1` 时才会执行
-- 推荐命令：
+## 隔离设计
+
+- 测试使用 `data/.pytest-env`，不读取仓库根目录 `.env`
+- API 集成测默认 `InMemoryTaskRepository`（任务 CRUD）
+- 部分结果/卖家订阅测试使用 PostgreSQL fixture 或 mock 存储
+- Live 测试在临时目录运行，清空通知环境变量
+- `test_cli_spider.py` 会临时 `pop` `src.seller_subscription_scraper`；依赖该模块的用例应在函数内 `importlib.import_module` 重新加载（见 `test_seller_subscription_scraper.py`）
+
+## Live Smoke
 
 ```bash
+# 一键脚本（推荐）
+./run_live_smoke.sh
+
+# 手动
 RUN_LIVE_TESTS=1 \
 LIVE_TEST_ACCOUNT_STATE_FILE=/absolute/path/to/account.json \
 LIVE_TEST_KEYWORD="MacBook Pro M2" \
 pytest tests/live -m live -v
 ```
 
-- 一键脚本：
+可选变量：`LIVE_TEST_TASK_NAME`、`LIVE_EXPECT_MIN_ITEMS`、`LIVE_TEST_DEBUG_LIMIT`、`LIVE_TIMEOUT_SECONDS`。
 
-```bash
-./run_live_smoke.sh
-./run_live_smoke.sh --without-generation
-```
+## 编写规范
 
-- 可选环境变量：
-  - `LIVE_TEST_TASK_NAME`
-  - `LIVE_EXPECT_MIN_ITEMS`（默认 `1`）
-  - `LIVE_TEST_DEBUG_LIMIT`（默认 `1`，只抓取/分析前 N 个新商品）
-  - `LIVE_TIMEOUT_SECONDS`（默认 `180`）
-  - `LIVE_ENABLE_TASK_GENERATION`（脚本默认 `1`；设为 `0` 或使用 `--without-generation` 可关闭真实 AI 任务生成慢用例）
-- live 套件会在临时工作目录中启动真实 `uvicorn`，并清空通知相关 env，避免污染仓库根目录或向真实通知通道发消息。
+1. 新文件放在 `tests/unit/` 或 `tests/integration/`
+2. 文件名 `test_*.py`，函数名 `test_*`
+3. 同步测试，不依赖 `pytest-asyncio`
+4. 外部依赖（Playwright / AI / 通知 / 网络）统一 mock
+5. 样例数据放 `tests/fixtures/`
+6. **新 API 路由应补集成测试**；新 service 优先单测
+
+## PR 检查清单
+
+- [ ] `python -m pytest -q` 全绿
+- [ ] 新功能已补测试或说明为何不测
+- [ ] 文档已同步（`docs/features.md` / `user-guide.md` 等）

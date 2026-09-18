@@ -31,7 +31,14 @@ class SchedulerService:
             print("调度器已停止")
 
     def get_next_run_time(self, task_id: int):
-        job = self.scheduler.get_job(f"task_{task_id}")
+        return self._job_next_run_time(f"task_{task_id}")
+
+    def get_seller_subscription_next_run_time(self):
+        """读取卖家订阅 job 的下次执行时间；job 未挂上时返回 None。"""
+        return self._job_next_run_time("seller_subscriptions")
+
+    def _job_next_run_time(self, job_id: str):
+        job = self.scheduler.get_job(job_id)
         if job is None:
             return None
 
@@ -49,10 +56,17 @@ class SchedulerService:
         except Exception:
             return None
 
+    def _remove_keyword_task_jobs(self) -> None:
+        """只移除 keyword 任务 job（id 以 task_ 开头），永不碰 seller_subscriptions。"""
+        for job in list(self.scheduler.get_jobs()):
+            job_id = str(job.id)
+            if job_id.startswith("task_"):
+                self.scheduler.remove_job(job_id)
+
     async def reload_jobs(self, tasks: List[Task]):
-        """重新加载所有定时任务"""
+        """重新加载关键词定时任务，保留卖家订阅独立 job。"""
         print("正在重新加载定时任务...")
-        self.scheduler.remove_all_jobs()
+        self._remove_keyword_task_jobs()
 
         for task in tasks:
             if task.task_type == TASK_TYPE_SELLER_SUBSCRIPTION:

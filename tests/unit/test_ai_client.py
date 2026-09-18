@@ -1,5 +1,6 @@
 import asyncio
 import os
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -284,5 +285,9 @@ def test_sanitize_no_proxy_handles_both_keys(monkeypatch):
     monkeypatch.setenv("NO_PROXY", "::1/128")
     monkeypatch.setenv("no_proxy", "fe80::1/10")
     _sanitize_no_proxy_env()
-    assert os.environ["NO_PROXY"] == "::1"
-    assert os.environ["no_proxy"] == "fe80::1"
+    if sys.platform == "win32":
+        # Windows treats NO_PROXY and no_proxy as the same environment variable.
+        assert os.environ["NO_PROXY"] == "fe80::1"
+    else:
+        assert os.environ["NO_PROXY"] == "::1"
+        assert os.environ["no_proxy"] == "fe80::1"

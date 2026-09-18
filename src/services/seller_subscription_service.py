@@ -18,6 +18,10 @@ from src.domain.seller_subscription import (
 
     SellerSubscriptionUpdate,
 
+    enrich_schedule,
+
+    resolve_schedule_run_headless,
+
 )
 
 from src.infrastructure.persistence.task_repository_factory import create_task_repository
@@ -50,7 +54,7 @@ async def list_subscription_overview() -> dict:
 
     items = await list_subscriptions()
 
-    schedule = await get_schedule()
+    schedule = enrich_schedule(await get_schedule())
 
     return {"items": items, "schedule": schedule}
 
@@ -118,7 +122,9 @@ async def remove_subscription(subscription_id: int) -> None:
 
 async def patch_schedule(payload: SellerSubscriptionScheduleUpdate) -> dict:
 
-    return await update_schedule(**payload.model_dump(exclude_unset=True))
+    schedule = await update_schedule(**payload.model_dump(exclude_unset=True))
+
+    return enrich_schedule(schedule)
 
 
 
@@ -152,6 +158,7 @@ async def build_scrape_task_config() -> dict | None:
 
         "account_strategy": schedule.get("account_strategy") or "auto",
         "pacing": schedule.get("pacing_json") or schedule.get("pacing"),
+        "run_headless": resolve_schedule_run_headless(schedule),
         "enabled": True,
     }
 

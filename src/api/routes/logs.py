@@ -7,11 +7,27 @@ import aiofiles
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 from src.api.dependencies import get_task_service
+from src.domain.seller_subscription import (
+    SELLER_SUBSCRIPTION_JOB_ID,
+    SELLER_SUBSCRIPTION_TASK_NAME,
+)
 from src.services.task_service import TaskService
 from src.utils import resolve_task_log_path
 
 
 router = APIRouter(prefix="/api/logs", tags=["logs"])
+
+
+async def _resolve_log_file_path_async(task_id: int, task_service: TaskService) -> str | None:
+    if task_id == SELLER_SUBSCRIPTION_JOB_ID:
+        return resolve_task_log_path(
+            SELLER_SUBSCRIPTION_JOB_ID,
+            SELLER_SUBSCRIPTION_TASK_NAME,
+        )
+    task = await task_service.get_task(task_id)
+    if not task:
+        return None
+    return resolve_task_log_path(task_id, task.task_name)
 
 
 async def _read_tail_lines(
@@ -55,7 +71,7 @@ async def _read_tail_lines(
 @router.get("")
 async def get_logs(
     from_pos: int = 0,
-    task_id: Optional[int] = Query(default=None, ge=0),
+    task_id: Optional[int] = Query(default=None),
     task_service: TaskService = Depends(get_task_service),
 ):
     """获取日志内容（增量读取）"""
@@ -65,14 +81,12 @@ async def get_logs(
             "new_pos": 0
         })
 
-    task = await task_service.get_task(task_id)
-    if not task:
+    log_file_path = await _resolve_log_file_path_async(task_id, task_service)
+    if log_file_path is None:
         return JSONResponse(status_code=404, content={
             "new_content": "任务不存在或已删除。",
             "new_pos": 0
         })
-
-    log_file_path = resolve_task_log_path(task_id, task.task_name)
 
     if not os.path.exists(log_file_path):
         return JSONResponse(content={
@@ -103,7 +117,7 @@ async def get_logs(
 
 @router.get("/tail")
 async def get_logs_tail(
-    task_id: Optional[int] = Query(default=None, ge=0),
+    task_id: Optional[int] = Query(default=None),
     offset_lines: int = Query(default=0, ge=0),
     limit_lines: int = Query(default=50, ge=1, le=1000),
     task_service: TaskService = Depends(get_task_service),
@@ -117,16 +131,14 @@ async def get_logs_tail(
             "new_pos": 0
         })
 
-    task = await task_service.get_task(task_id)
-    if not task:
+    log_file_path = await _resolve_log_file_path_async(task_id, task_service)
+    if log_file_path is None:
         return JSONResponse(status_code=404, content={
             "content": "",
             "has_more": False,
             "next_offset": 0,
             "new_pos": 0
         })
-
-    log_file_path = resolve_task_log_path(task_id, task.task_name)
 
     if not os.path.exists(log_file_path):
         return JSONResponse(content={
@@ -163,31 +175,16 @@ async def get_logs_tail(
 
 @router.delete("", response_model=dict)
 async def clear_logs(
-    task_id: Optional[int] = Query(default=None, ge=0),
+    task_id: Optional[int] = Query(default=None),
     task_service: TaskService = Depends(get_task_service),
 ):
     """清空日志文件"""
     if task_id is None:
         return {"message": "未指定任务，无法清空日志。"}
 
-    task = await task_service.get_task(task_id)
-    if not task:
+    log_file_path = await _resolve_log_file_path_async(task_id, task_service)
+    if log_file_path is None:
         return {"message": "任务不存在或已删除。"}
-
-    log_file_path = resolve_task_log_path(task_id, task.task_name)
-
-    if not os.path.exists(log_file_path):
-        return {"message": "日志文件不存在，无需清空。"}
-
-    try:
-        async with aiofiles.open(log_file_path, 'w', encoding='utf-8') as f:
-            await f.write("")
-        return {"message": "日志已成功清空。"}
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"message": f"清空日志文件时出错: {e}"}
-        )
 
     if not os.path.exists(log_file_path):
         return {"message": "日志文件不存在，无需清空。"}

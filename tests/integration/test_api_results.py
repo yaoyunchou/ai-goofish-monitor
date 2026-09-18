@@ -1,23 +1,23 @@
-import json
+import asyncio
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from src.api.routes import results
 from src.services.price_history_service import record_market_snapshots
+from src.services.result_storage_service import delete_result_file_records, save_result_record
 
 
-def _write_jsonl(path, records):
-    with open(path, "w", encoding="utf-8") as f:
-        for record in records:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+def _seed_result_records(filename: str, records: list[dict]) -> None:
+    keyword = filename.replace("_full_data.jsonl", "")
+    asyncio.run(delete_result_file_records(filename))
+    for record in records:
+        asyncio.run(save_result_record(record, keyword))
 
 
 def test_results_filter_and_sort_for_keyword_recommendations(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    jsonl_dir = tmp_path / "jsonl"
-    jsonl_dir.mkdir(parents=True, exist_ok=True)
-    target_file = jsonl_dir / "demo_full_data.jsonl"
+    filename = "demo_full_data.jsonl"
 
     records = [
         {
@@ -50,14 +50,14 @@ def test_results_filter_and_sort_for_keyword_recommendations(tmp_path, monkeypat
             },
         },
     ]
-    _write_jsonl(target_file, records)
+    _seed_result_records(filename, records)
 
     app = FastAPI()
     app.include_router(results.router)
     client = TestClient(app)
 
     resp = client.get(
-        "/api/results/demo_full_data.jsonl",
+        f"/api/results/{filename}",
         params={"keyword_recommended_only": True, "sort_by": "keyword_hit_count", "sort_order": "desc"},
     )
     assert resp.status_code == 200
@@ -67,7 +67,7 @@ def test_results_filter_and_sort_for_keyword_recommendations(tmp_path, monkeypat
     assert data["items"][1]["ai_analysis"]["keyword_hit_count"] == 1
 
     resp = client.get(
-        "/api/results/demo_full_data.jsonl",
+        f"/api/results/{filename}",
         params={"ai_recommended_only": True},
     )
     assert resp.status_code == 200
@@ -76,7 +76,7 @@ def test_results_filter_and_sort_for_keyword_recommendations(tmp_path, monkeypat
     assert data["items"][0]["ai_analysis"]["analysis_source"] == "ai"
 
     resp = client.get(
-        "/api/results/demo_full_data.jsonl",
+        f"/api/results/{filename}",
         params={"ai_recommended_only": True, "keyword_recommended_only": True},
     )
     assert resp.status_code == 400
@@ -84,9 +84,7 @@ def test_results_filter_and_sort_for_keyword_recommendations(tmp_path, monkeypat
 
 def test_results_insights_and_export_csv(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    jsonl_dir = tmp_path / "jsonl"
-    jsonl_dir.mkdir(parents=True, exist_ok=True)
-    target_file = jsonl_dir / "demo_full_data.jsonl"
+    filename = "demo_full_data.jsonl"
 
     records = [
         {
@@ -127,7 +125,7 @@ def test_results_insights_and_export_csv(tmp_path, monkeypatch):
             },
         },
     ]
-    _write_jsonl(target_file, records)
+    _seed_result_records(filename, records)
 
     record_market_snapshots(
         keyword="demo",
@@ -176,19 +174,19 @@ def test_results_insights_and_export_csv(tmp_path, monkeypatch):
     app.include_router(results.router)
     client = TestClient(app)
 
-    insights_resp = client.get("/api/results/demo_full_data.jsonl/insights")
+    insights_resp = client.get(f"/api/results/{filename}/insights")
     assert insights_resp.status_code == 200
     insights = insights_resp.json()
     assert insights["market_summary"]["sample_count"] == 2
     assert len(insights["daily_trend"]) == 2
 
-    list_resp = client.get("/api/results/demo_full_data.jsonl")
+    list_resp = client.get(f"/api/results/{filename}")
     assert list_resp.status_code == 200
     items = list_resp.json()["items"]
     assert items[0]["price_insight"]["observation_count"] >= 1
 
     export_resp = client.get(
-        "/api/results/demo_full_data.jsonl/export",
+        f"/api/results/{filename}/export",
         params={"sort_by": "price", "sort_order": "asc"},
     )
     assert export_resp.status_code == 200
@@ -200,9 +198,7 @@ def test_results_insights_and_export_csv(tmp_path, monkeypatch):
 
 def test_results_export_csv_supports_unicode_filename(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    jsonl_dir = tmp_path / "jsonl"
-    jsonl_dir.mkdir(parents=True, exist_ok=True)
-    target_file = jsonl_dir / "演示_full_data.jsonl"
+    filename = "演示_full_data.jsonl"
 
     records = [
         {
@@ -224,13 +220,13 @@ def test_results_export_csv_supports_unicode_filename(tmp_path, monkeypatch):
             },
         }
     ]
-    _write_jsonl(target_file, records)
+    _seed_result_records(filename, records)
 
     app = FastAPI()
     app.include_router(results.router)
     client = TestClient(app)
 
-    export_resp = client.get("/api/results/演示_full_data.jsonl/export")
+    export_resp = client.get(f"/api/results/{filename}/export")
     assert export_resp.status_code == 200
     assert "text/csv" in export_resp.headers["content-type"]
     disposition = export_resp.headers["content-disposition"]
@@ -240,9 +236,7 @@ def test_results_export_csv_supports_unicode_filename(tmp_path, monkeypatch):
 
 def test_results_blacklist_rules_hide_items_from_view_and_insights(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    jsonl_dir = tmp_path / "jsonl"
-    jsonl_dir.mkdir(parents=True, exist_ok=True)
-    target_file = jsonl_dir / "macbook_air_m1_full_data.jsonl"
+    filename = "macbook_air_m1_full_data.jsonl"
 
     records = [
         {
@@ -300,7 +294,7 @@ def test_results_blacklist_rules_hide_items_from_view_and_insights(tmp_path, mon
             },
         },
     ]
-    _write_jsonl(target_file, records)
+    _seed_result_records(filename, records)
 
     record_market_snapshots(
         keyword="MacBook Air M1",
@@ -362,24 +356,24 @@ def test_results_blacklist_rules_hide_items_from_view_and_insights(tmp_path, mon
     client = TestClient(app)
 
     update_rules_resp = client.put(
-        "/api/results/macbook_air_m1_full_data.jsonl/blacklist-rules",
+        f"/api/results/{filename}/blacklist-rules",
         json={"keywords": ["intel"]},
     )
     assert update_rules_resp.status_code == 200
     assert update_rules_resp.json()["keywords"] == ["intel"]
 
-    rules_resp = client.get("/api/results/macbook_air_m1_full_data.jsonl/blacklist-rules")
+    rules_resp = client.get(f"/api/results/{filename}/blacklist-rules")
     assert rules_resp.status_code == 200
     assert rules_resp.json()["keywords"] == ["intel"]
 
-    filtered_resp = client.get("/api/results/macbook_air_m1_full_data.jsonl")
+    filtered_resp = client.get(f"/api/results/{filename}")
     assert filtered_resp.status_code == 200
     filtered_payload = filtered_resp.json()
     assert filtered_payload["total_items"] == 1
     assert [item["商品信息"]["商品ID"] for item in filtered_payload["items"]] == ["2001"]
 
     include_hidden_resp = client.get(
-        "/api/results/macbook_air_m1_full_data.jsonl",
+        f"/api/results/{filename}",
         params={"include_hidden": True},
     )
     assert include_hidden_resp.status_code == 200
@@ -392,25 +386,25 @@ def test_results_blacklist_rules_hide_items_from_view_and_insights(tmp_path, mon
     assert hidden_item["_hidden_reason"] == "rule"
     assert hidden_item["_matched_blacklist_keywords"] == ["intel"]
 
-    insights_resp = client.get("/api/results/macbook_air_m1_full_data.jsonl/insights")
+    insights_resp = client.get(f"/api/results/{filename}/insights")
     assert insights_resp.status_code == 200
     insights = insights_resp.json()
     assert insights["market_summary"]["sample_count"] == 1
     assert insights["market_summary"]["avg_price"] == 4200.0
     assert all(point["sample_count"] == 1 for point in insights["daily_trend"])
 
-    list_resp = client.get("/api/results/macbook_air_m1_full_data.jsonl")
+    list_resp = client.get(f"/api/results/{filename}")
     assert list_resp.status_code == 200
     visible_item = list_resp.json()["items"][0]
     assert visible_item["price_insight"]["market_avg_price"] == 4200.0
 
-    export_resp = client.get("/api/results/macbook_air_m1_full_data.jsonl/export")
+    export_resp = client.get(f"/api/results/{filename}/export")
     assert export_resp.status_code == 200
     assert "MacBook Air M1 8+256" in export_resp.text
     assert "MacBook Air Intel i5 8+256" not in export_resp.text
     assert "MacBook Pro Intel 13寸" not in export_resp.text
 
-    download_resp = client.get("/api/results/files/macbook_air_m1_full_data.jsonl")
+    download_resp = client.get(f"/api/results/files/{filename}")
     assert download_resp.status_code == 200
     assert "MacBook Air Intel i5 8+256" in download_resp.text
     assert "MacBook Pro Intel 13寸" in download_resp.text

@@ -6,12 +6,14 @@ A Playwright and AI-powered multi-task real-time monitoring tool for Xianyu (闲
 
 ## Core Features
 
-- **Web Visual Management**: Task management, account management, AI criteria editing, run logs, results browsing
+- **Web Visual Management**: Tasks, accounts, seller subscriptions, shop analytics dashboard, logs, results
+- **Seller Subscriptions**: Batch collect from seller profiles; track want/view metrics over time
+- **Shop Analytics**: Seller workbench datacompass (1d/7d/30d) with traffic and distribution charts
 - **AI-Driven**: Natural language task creation, multimodal model for in-depth product analysis
 - **Multi-Task Concurrency**: Independent configuration for keywords, prices, filters, and AI prompts
-- **SQLite as Primary Storage**: Tasks, results, and price history are persisted in one embedded database instead of repeatedly scanning `jsonl`
+- **PostgreSQL Storage**: Primary data in PostgreSQL (`DATABASE_URL`); `jsonl/` used for bootstrap only
 - **Advanced Filtering**: Free shipping, new listing time range, province/city/district filtering
-- **Instant Notifications**: Supports ntfy.sh, WeChat Work (企业微信), Bark, Telegram, Webhook
+- **Instant Notifications**: Supports ntfy.sh, WeChat Work, Bark, Telegram, Gotify, Webhook
 - **Scheduled Tasks**: Cron expression configuration for periodic tasks
 - **Account & Proxy Rotation**: Multi-account management, task-account binding, proxy pool rotation with failure retry
 - **Docker Deployment**: One-click containerized deployment

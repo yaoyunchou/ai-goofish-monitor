@@ -51,4 +51,10 @@ def test_save_to_jsonl(tmp_path, monkeypatch):
             sort_order="asc",
         )
     )
-    assert records == [record]
+    assert len(records) == 1
+    stored = {
+        key: value
+        for key, value in records[0].items()
+        if not str(key).startswith("_")
+    }
+    assert stored == record

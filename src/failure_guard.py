@@ -188,6 +188,8 @@ class FailureGuard:
 
     def _update_task(self, task_key: str, updater) -> dict:
         _ensure_parent_dir(self.path)
+        entry: dict
+        data: dict
         with open(self.path, "a+", encoding="utf-8") as fh:
             with _FileLock(fh):
                 fh.seek(0)
@@ -198,8 +200,9 @@ class FailureGuard:
                     entry = {}
                 entry = updater(entry) or entry
                 tasks[task_key] = entry
-                self._save(data)
-                return entry
+        # Close the file before atomic replace; Windows rejects os.replace on open files.
+        self._save(data)
+        return entry
 
     def record_success(self, task_key: str, *, now: Optional[datetime] = None) -> None:
         def _reset(_: dict) -> dict:

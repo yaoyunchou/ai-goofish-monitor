@@ -43,6 +43,10 @@ WEBHOOK_QUERY_PARAMETERS = os.getenv("WEBHOOK_QUERY_PARAMETERS")
 WEBHOOK_BODY = os.getenv("WEBHOOK_BODY")
 PCURL_TO_MOBILE = os.getenv("PCURL_TO_MOBILE", "false").lower() == "true"
 RUN_HEADLESS = os.getenv("RUN_HEADLESS", "true").lower() != "false"
+# 开发调试：在 Web「采集控制台」内嵌展示卖家订阅日志（生产环境保持 false）
+SELLER_SUBSCRIPTION_CONSOLE_LOG = (
+    os.getenv("SELLER_SUBSCRIPTION_CONSOLE_LOG", "false").lower() == "true"
+)
 LOGIN_IS_EDGE = os.getenv("LOGIN_IS_EDGE", "false").lower() == "true"
 RUNNING_IN_DOCKER = os.getenv("RUNNING_IN_DOCKER", "false").lower() == "true"
 AI_DEBUG_MODE = os.getenv("AI_DEBUG_MODE", "false").lower() == "true"
