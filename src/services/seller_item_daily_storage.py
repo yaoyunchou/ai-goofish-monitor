@@ -20,6 +20,14 @@ __all__ = [
     "list_item_ids_with_daily_snapshot_sync",
     "upsert_seller_item_daily_snapshot",
     "upsert_seller_item_daily_snapshot_sync",
+    "weekly_item_growth",
+    "weekly_item_growth_sync",
+    "load_muted_item_ids",
+    "load_muted_item_ids_sync",
+    "mute_items",
+    "mute_items_sync",
+    "unmute_item",
+    "unmute_item_sync",
 ]
 
 
@@ -461,3 +469,212 @@ async def count_latest_item_daily_metrics(**kwargs) -> int:
 
 async def get_item_detail_from_daily(task_name: str, item_id: str) -> dict[str, Any]:
     return await asyncio.to_thread(get_item_detail_from_daily_sync, task_name, item_id)
+
+
+# ---------------------------------------------------------------------------
+# 商品级周增长聚合（监控健康度自动停用用）
+# ---------------------------------------------------------------------------
+
+_WEEKLY_GROWTH_SQL = """
+    WITH first_seen AS (
+        SELECT DISTINCT ON (m.seller_user_id, m.item_id)
+               m.seller_user_id, m.item_id, m.snapshot_day,
+               m.view_count, m.want_count
+        FROM seller_item_daily_metrics m
+        WHERE m.snapshot_day BETWEEN ? AND ?
+        ORDER BY m.seller_user_id, m.item_id, m.snapshot_day ASC, m.captured_at ASC
+    ),
+    last_seen AS (
+        SELECT DISTINCT ON (m.seller_user_id, m.item_id)
+               m.seller_user_id, m.item_id, m.snapshot_day,
+               m.view_count, m.want_count
+        FROM seller_item_daily_metrics m
+        WHERE m.snapshot_day BETWEEN ? AND ?
+        ORDER BY m.seller_user_id, m.item_id, m.snapshot_day DESC, m.captured_at DESC
+    ),
+    span AS (
+        SELECT m.seller_user_id, m.item_id,
+               COUNT(*)          AS days_with_data,
+               MIN(m.snapshot_day) AS first_day,
+               MAX(m.snapshot_day) AS last_day
+        FROM seller_item_daily_metrics m
+        WHERE m.snapshot_day BETWEEN ? AND ?
+        GROUP BY m.seller_user_id, m.item_id
+    )
+    SELECT f.seller_user_id,
+           f.item_id,
+           s.days_with_data,
+           s.first_day,
+           s.last_day,
+           f.view_count AS view_start,
+           l.view_count AS view_end,
+           COALESCE(l.view_count, 0) - COALESCE(f.view_count, 0) AS view_growth,
+           f.want_count AS want_start,
+           l.want_count AS want_end,
+           COALESCE(l.want_count, 0) - COALESCE(f.want_count, 0) AS want_growth,
+           i.title,
+           i.price,
+           i.item_status,
+           i.item_link,
+           i.first_seen_at,
+           COALESCE(i.is_muted, FALSE) AS is_muted
+    FROM first_seen f
+    JOIN last_seen l USING (seller_user_id, item_id)
+    JOIN span      s USING (seller_user_id, item_id)
+    LEFT JOIN seller_subscription_items i
+           ON i.seller_user_id = f.seller_user_id
+          AND i.item_id = f.item_id
+"""
+
+
+def _to_iso_date(value: Any) -> str | None:
+    if value is None:
+        return None
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    text = str(value).strip()
+    return text or None
+
+
+def weekly_item_growth_sync(
+    week_start: date,
+    week_end: date,
+) -> list[dict[str, Any]]:
+    """按「卖家 + 商品」聚合一自然周内的浏览/想要增长。
+
+    增长 = 窗口内最后一天的值 - 窗口内第一天的值。
+    只返回窗口内 **至少跨 2 天** 的商品（单天数据无法算增长，直接排除）。
+
+    边界约定：
+      - want_count / view_count 为 NULL 时按 0 参与差值（COALESCE），
+        但 `has_metric_data` 会标记首末是否都有真实值，供判定层决定是否跳过。
+      - `last_day` 由调用方与 `week_end` 比较，用于识别「数据中断」。
+    """
+    bootstrap_storage()
+    params = (
+        week_start.isoformat(),
+        week_end.isoformat(),
+        week_start.isoformat(),
+        week_end.isoformat(),
+        week_start.isoformat(),
+        week_end.isoformat(),
+    )
+    with db_connection() as conn:
+        rows = conn.execute(_WEEKLY_GROWTH_SQL, params).fetchall()
+
+    results: list[dict[str, Any]] = []
+    for row in rows:
+        payload = dict(row)
+        first_day = _to_iso_date(payload.get("first_day"))
+        last_day = _to_iso_date(payload.get("last_day"))
+        # 仅在首末都不是同一天时才计入（防御性校验，SQL 已过滤）
+        if not first_day or not last_day or first_day >= last_day:
+            continue
+        payload["first_day"] = first_day
+        payload["last_day"] = last_day
+        payload["days_with_data"] = int(payload.get("days_with_data") or 0)
+        payload["view_start"] = payload.get("view_start")
+        payload["view_end"] = payload.get("view_end")
+        payload["want_start"] = payload.get("want_start")
+        payload["want_end"] = payload.get("want_end")
+        payload["view_growth"] = int(payload.get("view_growth") or 0)
+        payload["want_growth"] = int(payload.get("want_growth") or 0)
+        payload["is_muted"] = bool(payload.get("is_muted"))
+        payload["has_metric_data"] = (
+            payload["view_start"] is not None
+            and payload["view_end"] is not None
+            and payload["want_start"] is not None
+            and payload["want_end"] is not None
+        )
+        first_seen_at = payload.get("first_seen_at")
+        payload["first_seen_at"] = (
+            first_seen_at.isoformat() if hasattr(first_seen_at, "isoformat") else first_seen_at
+        )
+        results.append(payload)
+    return results
+
+
+async def weekly_item_growth(week_start: date, week_end: date) -> list[dict[str, Any]]:
+    return await asyncio.to_thread(weekly_item_growth_sync, week_start, week_end)
+
+
+def load_muted_item_ids_sync(seller_user_id: str) -> set[str]:
+    """返回该卖家下已被停用监控的商品 ID 集合，供采集阶段过滤。"""
+    bootstrap_storage()
+    with db_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT item_id
+            FROM seller_subscription_items
+            WHERE seller_user_id = ? AND is_muted = TRUE
+            """,
+            (seller_user_id,),
+        ).fetchall()
+    return {str(row["item_id"]) for row in rows}
+
+
+async def load_muted_item_ids(seller_user_id: str) -> set[str]:
+    return await asyncio.to_thread(load_muted_item_ids_sync, seller_user_id)
+
+
+def mute_items_sync(
+    items: list[dict[str, Any]],
+    *,
+    reason: str,
+    week_start: date,
+) -> int:
+    """批量标记商品为「已停止监控」。items 需含 seller_user_id + item_id。"""
+    if not items:
+        return 0
+    bootstrap_storage()
+    muted_at = shanghai_now_iso()
+    updated = 0
+    with db_connection() as conn:
+        for item in items:
+            cursor = conn.execute(
+                """
+                UPDATE seller_subscription_items
+                SET is_muted = TRUE,
+                    muted_at = ?,
+                    muted_reason = ?,
+                    muted_week = ?
+                WHERE seller_user_id = ? AND item_id = ?
+                """,
+                (
+                    muted_at,
+                    reason,
+                    week_start.isoformat(),
+                    str(item.get("seller_user_id")),
+                    str(item.get("item_id")),
+                ),
+            )
+            updated += cursor.rowcount or 0
+        conn.commit()
+    return updated
+
+
+async def mute_items(items: list[dict[str, Any]], **kwargs) -> int:
+    return await asyncio.to_thread(lambda: mute_items_sync(items, **kwargs))
+
+
+def unmute_item_sync(seller_user_id: str, item_id: str) -> bool:
+    """恢复单个商品的监控。"""
+    bootstrap_storage()
+    with db_connection() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE seller_subscription_items
+            SET is_muted = FALSE,
+                muted_at = NULL,
+                muted_reason = NULL,
+                muted_week = NULL
+            WHERE seller_user_id = ? AND item_id = ?
+            """,
+            (seller_user_id, item_id),
+        )
+        conn.commit()
+        return (cursor.rowcount or 0) > 0
+
+
+async def unmute_item(seller_user_id: str, item_id: str) -> bool:
+    return await asyncio.to_thread(unmute_item_sync, seller_user_id, item_id)

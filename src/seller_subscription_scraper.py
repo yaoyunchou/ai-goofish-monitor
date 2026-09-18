@@ -19,6 +19,7 @@ from src.scraper import (
 )
 from src.services.seller_item_daily_storage import (
     list_item_ids_with_daily_snapshot_sync,
+    load_muted_item_ids_sync,
     upsert_seller_item_daily_snapshot,
 )
 from src.time_utils import shanghai_now_iso
@@ -228,6 +229,32 @@ async def _scrape_seller_ids(
                     (str(user_id), f"主页无在售商品（解析 {raw_count} 条）")
                 )
                 continue
+
+            # 剔除已停止监控的商品（健康度判定自动停用或人工停用）。
+            # 必须在 _split_items_by_today_coverage 之前过滤，
+            # 否则「今日已采集」的判定会把已停用商品重新拉回详情队列。
+            # 读取失败时降级为空集合：停用过滤是优化手段，不应中断整轮采集。
+            try:
+                muted_ids = load_muted_item_ids_sync(user_id)
+            except Exception as exc:
+                print(f"   [警告] 读取已停用商品失败，本轮不过滤: {exc}")
+                muted_ids = set()
+            if muted_ids:
+                before = len(items)
+                items = [
+                    item
+                    for item in items
+                    if str(item.get("商品ID") or item.get("item_id") or "") not in muted_ids
+                ]
+                skipped_muted = before - len(items)
+                if skipped_muted:
+                    print(f"   ⏭ 跳过 {skipped_muted} 个已停止监控的商品")
+                if not items:
+                    print(f"   卖家 {user_id} 在售商品均已停止监控，跳过详情采集。")
+                    skipped_sellers.append(
+                        (str(user_id), f"在售商品均已停止监控（过滤 {skipped_muted} 条）")
+                    )
+                    continue
 
             missing_items, covered_items = _split_items_by_today_coverage(
                 task_name=task_name,

@@ -90,6 +90,7 @@ def test_scrape_seller_subscription_skips_items_without_want_and_view():
             "list_item_ids_with_daily_snapshot_sync",
             return_value=set(),
         ),
+        patch.object(mod, "load_muted_item_ids_sync", return_value=set()),
         patch.object(mod.SubscriptionPacing, "from_task_config", return_value=pacing),
         patch.object(mod, "launch_task_browser", new=AsyncMock(side_effect=fake_launch)),
         patch.object(mod, "scrape_user_profile", new=AsyncMock(side_effect=fake_profile)),
@@ -181,6 +182,7 @@ def test_scrape_prioritizes_items_without_today_snapshot():
             "list_item_ids_with_daily_snapshot_sync",
             return_value={"item-1"},
         ),
+        patch.object(mod, "load_muted_item_ids_sync", return_value=set()),
         patch.object(mod, "launch_task_browser", new=AsyncMock(side_effect=fake_launch)),
         patch.object(mod, "scrape_user_profile", new=AsyncMock(side_effect=fake_profile)),
         patch.object(mod, "fetch_item_detail", new=AsyncMock(side_effect=fake_detail)),
@@ -269,6 +271,7 @@ def test_scrape_runs_new_seller_missing_before_old_seller_updates():
     with (
         patch.object(mod.SubscriptionPacing, "from_task_config", return_value=pacing),
         patch.object(mod, "list_item_ids_with_daily_snapshot_sync", side_effect=fake_covered_ids),
+        patch.object(mod, "load_muted_item_ids_sync", return_value=set()),
         patch.object(mod, "launch_task_browser", new=AsyncMock(side_effect=fake_launch)),
         patch.object(mod, "scrape_user_profile", new=AsyncMock(side_effect=fake_profile)),
         patch.object(mod, "fetch_item_detail", new=AsyncMock(side_effect=fake_detail)),
@@ -351,6 +354,7 @@ def test_scrape_never_captured_shop_before_old_shop_even_if_fewer_missing():
     with (
         patch.object(mod.SubscriptionPacing, "from_task_config", return_value=pacing),
         patch.object(mod, "list_item_ids_with_daily_snapshot_sync", return_value=set()),
+        patch.object(mod, "load_muted_item_ids_sync", return_value=set()),
         patch.object(mod, "_never_captured_seller_ids", return_value={"22222222222"}),
         patch.object(mod, "launch_task_browser", new=AsyncMock(side_effect=fake_launch)),
         patch.object(mod, "scrape_user_profile", new=AsyncMock(side_effect=fake_profile)),
@@ -454,6 +458,7 @@ def test_scrape_reports_whole_skipped_seller_in_summary(capsys):
     pacing.after_detail = AsyncMock()
     with (
         patch.object(mod, "list_item_ids_with_daily_snapshot_sync", return_value=set()),
+        patch.object(mod, "load_muted_item_ids_sync", return_value=set()),
         patch.object(mod.SubscriptionPacing, "from_task_config", return_value=pacing),
         patch.object(mod, "launch_task_browser", new=AsyncMock(side_effect=fake_launch)),
         patch.object(mod, "scrape_user_profile", new=AsyncMock(side_effect=fake_profile)),

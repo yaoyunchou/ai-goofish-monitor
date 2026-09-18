@@ -2,6 +2,7 @@
 调度服务
 负责管理定时任务的调度
 """
+import os
 from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from typing import List
@@ -9,6 +10,9 @@ from typing import List
 from src.core.cron_utils import build_cron_trigger
 from src.domain.models.task import TASK_TYPE_SELLER_SUBSCRIPTION, Task
 from src.services.process_service import ProcessService
+
+MONITOR_HEALTH_JOB_ID = "item_monitor_health_weekly"
+DEFAULT_MONITOR_HEALTH_CRON = "0 9 * * 1"  # 每周一 09:00（Asia/Shanghai）
 
 
 class SchedulerService:
@@ -115,6 +119,38 @@ class SchedulerService:
             except ValueError as exc:
                 print(f"  -> [警告] 卖家订阅 Cron 无效: {exc}")
 
+    def reload_monitor_health_job(self, cron: str | None = None) -> bool:
+        """加载商品监控健康度周判定 job（单例）。
+
+        注意：这里 **不** 由 reload_jobs 调用 —— reload_jobs 只清理 `task_*`，
+        本 job 与 seller_subscriptions 一样是独立单例，避免被误删。
+        """
+        existing = self.scheduler.get_job(MONITOR_HEALTH_JOB_ID)
+        if existing is not None:
+            self.scheduler.remove_job(MONITOR_HEALTH_JOB_ID)
+
+        expression = (cron or os.getenv("MONITOR_HEALTH_CRON") or DEFAULT_MONITOR_HEALTH_CRON).strip()
+        if not expression:
+            return False
+        try:
+            trigger = build_cron_trigger(expression, timezone=self.scheduler.timezone)
+        except ValueError as exc:
+            print(f"  -> [警告] 监控健康度 Cron 无效（{expression}）: {exc}")
+            return False
+
+        self.scheduler.add_job(
+            self._run_monitor_health_check,
+            trigger=trigger,
+            id=MONITOR_HEALTH_JOB_ID,
+            name="Scheduled: item monitor health check",
+            replace_existing=True,
+        )
+        print(f"  -> 已为商品监控健康度添加定时规则: '{expression}'")
+        return True
+
+    def get_monitor_health_next_run_time(self):
+        return self._job_next_run_time(MONITOR_HEALTH_JOB_ID)
+
     async def _run_task(self, task_id: int, task_name: str):
         """执行定时任务"""
         print(f"定时任务触发: 正在为任务 '{task_name}' 启动爬虫...")
@@ -123,3 +159,22 @@ class SchedulerService:
     async def _run_seller_subscriptions(self):
         print("定时任务触发: 正在启动卖家订阅采集...")
         await self.process_service.start_seller_subscription_job()
+
+    async def _run_monitor_health_check(self):
+        """执行商品监控健康度周判定（自动停用 + 通知）。"""
+        from src.services.item_monitor_health_service import run_weekly_check
+
+        print("定时任务触发: 正在执行商品监控健康度周判定...")
+        try:
+            summary = await run_weekly_check()
+            print(
+                "  监控健康度判定完成: "
+                f"评估 {summary.get('evaluated', 0)} 个商品，"
+                f"保留 {summary.get('kept', 0)}，"
+                f"跳过 {summary.get('skipped', 0)}，"
+                f"中断 {summary.get('interrupted', 0)}，"
+                f"停用 {summary.get('muted', 0)}"
+                f"{'（试运行）' if summary.get('dry_run') else ''}"
+            )
+        except Exception as exc:  # 判定失败不能影响其它调度
+            print(f"  [错误] 监控健康度判定失败: {exc}")

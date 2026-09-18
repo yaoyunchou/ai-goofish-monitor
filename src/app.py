@@ -111,6 +111,7 @@ async def lifespan(app: FastAPI):
     await set_subscription_running(False)
     schedule = await get_schedule()
     await scheduler_service.reload_seller_subscription_job(schedule)
+    scheduler_service.reload_monitor_health_job()
     await scheduler_service.reload_jobs(tasks_list)
     scheduler_service.start()
 

@@ -189,6 +189,37 @@ _INCREMENTAL_SCHEMA_STATEMENTS = [
         ON seller_profiles (task_name, seller_user_id, profile_day)
         WHERE profile_day IS NOT NULL
     """,
+    # --- 商品级监控健康度自动停用 ---
+    "ALTER TABLE seller_subscription_items ADD COLUMN IF NOT EXISTS is_muted BOOLEAN NOT NULL DEFAULT FALSE",
+    "ALTER TABLE seller_subscription_items ADD COLUMN IF NOT EXISTS muted_at TIMESTAMPTZ",
+    "ALTER TABLE seller_subscription_items ADD COLUMN IF NOT EXISTS muted_reason TEXT",
+    "ALTER TABLE seller_subscription_items ADD COLUMN IF NOT EXISTS muted_week DATE",
+    "CREATE INDEX IF NOT EXISTS idx_seller_subscription_items_muted ON seller_subscription_items (seller_user_id, is_muted)",
+    """
+    CREATE TABLE IF NOT EXISTS item_monitor_health_weekly (
+        id             BIGSERIAL PRIMARY KEY,
+        week_start     DATE NOT NULL,
+        week_end       DATE NOT NULL,
+        seller_user_id TEXT NOT NULL,
+        item_id        TEXT NOT NULL,
+        title          TEXT,
+        days_with_data INT,
+        view_start     INTEGER,
+        view_end       INTEGER,
+        view_growth    INTEGER,
+        want_start     INTEGER,
+        want_end       INTEGER,
+        want_growth    INTEGER,
+        healthy        BOOLEAN NOT NULL,
+        reason         TEXT,
+        action         TEXT NOT NULL,
+        decided_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+        CONSTRAINT uq_item_monitor_health_week
+            UNIQUE (week_start, seller_user_id, item_id)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_item_monitor_health_week ON item_monitor_health_weekly (week_start DESC, action)",
+    "CREATE INDEX IF NOT EXISTS idx_item_monitor_health_item ON item_monitor_health_weekly (seller_user_id, item_id, week_start DESC)",
 ]
 
 

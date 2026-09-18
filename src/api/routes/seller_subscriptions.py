@@ -68,6 +68,20 @@ from src.services.seller_subscription_storage import (
 
 from src.services.task_payloads import serialize_timestamp
 
+from src.services.item_monitor_health_service import (
+
+    MonitorConfig,
+
+    list_health_decisions_sync,
+
+    latest_week_sync,
+
+    run_weekly_check,
+
+)
+
+from src.services.seller_item_daily_storage import unmute_item
+
 
 
 router = APIRouter(prefix="/api/seller-subscriptions", tags=["seller-subscriptions"])
@@ -306,6 +320,72 @@ async def get_items(
 
 
 
+@router.get("/items/health")
+
+async def get_item_health(
+
+    week_start: str | None = Query(None, description="判定周起始日 YYYY-MM-DD（周一）"),
+
+    action: str | None = Query(None, description="按动作过滤：kept|muted|dry_run|skipped|interrupted"),
+
+    limit: int = Query(200, ge=1, le=2000),
+
+    scheduler_service: SchedulerService = Depends(get_scheduler_service),
+
+):
+
+    """商品监控健康度周判定结果。不传 week_start 时返回最近一次判定的周。
+
+    注意：本路由必须声明在 `/items/{item_id}/detail` 之前，
+
+    否则 "health" 会被当作 item_id 匹配掉。
+    """
+
+    from datetime import date as _date
+
+    parsed: _date | None = None
+
+    if week_start:
+
+        try:
+
+            parsed = _date.fromisoformat(week_start.strip())
+
+        except ValueError:
+
+            raise HTTPException(status_code=400, detail="week_start 格式应为 YYYY-MM-DD")
+
+    else:
+
+        parsed = latest_week_sync()
+
+    rows = list_health_decisions_sync(week_start=parsed, action=action, limit=limit)
+
+    counts: dict[str, int] = {}
+
+    for row in rows:
+
+        key = str(row.get("action") or "unknown")
+
+        counts[key] = counts.get(key, 0) + 1
+
+    return {
+
+        "week_start": parsed.isoformat() if parsed else None,
+
+        "counts": counts,
+
+        "total": len(rows),
+
+        "config": MonitorConfig.from_env().__dict__,
+
+        "next_run_at": serialize_timestamp(scheduler_service.get_monitor_health_next_run_time()),
+
+        "items": rows,
+
+    }
+
+
 @router.get("/items/{item_id}/detail")
 
 async def get_item_detail(item_id: str):
@@ -424,5 +504,73 @@ async def get_stats(
         "schedule": schedule,
 
     }
+
+
+@router.post("/items/health/run")
+
+async def run_item_health_check(
+
+    week_start: str | None = Query(None, description="判定周起始日 YYYY-MM-DD"),
+
+    week_end: str | None = Query(None, description="判定周结束日 YYYY-MM-DD"),
+
+    dry_run: bool | None = Query(None, description="覆盖 MONITOR_DRY_RUN，仅本次生效"),
+
+    notify: bool = Query(True, description="是否推送通知"),
+
+):
+
+    """手动触发一次商品监控健康度判定。默认沿用环境变量的影子模式设置。"""
+
+    from datetime import date as _date
+
+    def _parse(value: str | None, label: str) -> _date | None:
+
+        if not value:
+
+            return None
+
+        try:
+
+            return _date.fromisoformat(value.strip())
+
+        except ValueError:
+
+            raise HTTPException(status_code=400, detail=f"{label} 格式应为 YYYY-MM-DD")
+
+    summary = await run_weekly_check(
+
+        week_start=_parse(week_start, "week_start"),
+
+        week_end=_parse(week_end, "week_end"),
+
+        dry_run=dry_run,
+
+        notify=notify,
+
+    )
+
+    return {"message": "监控健康度判定已完成", "summary": summary}
+
+
+@router.post("/items/{item_id}/restore")
+
+async def restore_item_monitoring(
+
+    item_id: str,
+
+    seller_user_id: str = Query(..., description="商品所属卖家的 seller_user_id"),
+
+):
+
+    """恢复单个商品的监控（清除自动停用标记）。"""
+
+    restored = await unmute_item(seller_user_id, item_id)
+
+    if not restored:
+
+        raise HTTPException(status_code=404, detail="未找到该商品记录，无法恢复监控")
+
+    return {"message": f"商品 {item_id} 已恢复监控"}
 
 

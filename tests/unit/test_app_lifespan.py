@@ -20,12 +20,18 @@ class _FakeSchedulerService:
         self.stopped = False
         self.reload_payload = None
         self.subscription_schedule = None
+        self.monitor_health_reloaded = False
 
     async def reload_jobs(self, tasks):
         self.reload_payload = list(tasks)
 
     async def reload_seller_subscription_job(self, schedule):
         self.subscription_schedule = schedule
+
+    def reload_monitor_health_job(self, cron=None):
+        """lifespan 启动时会加载商品监控健康度周判定 job。"""
+        self.monitor_health_reloaded = True
+        return True
 
     def start(self):
         self.started = True
