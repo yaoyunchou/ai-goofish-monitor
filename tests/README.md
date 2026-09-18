@@ -4,36 +4,52 @@
 
 ## 安装依赖
 
-在运行测试之前，请确保已安装所有开发依赖项：
+在运行测试之前，请确保已安装所有开发依赖项。**推荐使用项目虚拟环境 `.venv`：**
 
 ```bash
-pip install -r requirements.txt
+# 首次创建
+python -m venv .venv
+source .venv/Scripts/activate   # Windows；Linux/macOS 用 .venv/bin/activate
+python -m pip install -r requirements.txt
+
+# 已创建则可直接激活
+source .venv/Scripts/activate
 ```
 
+> 也可不激活，直接调用 `./.venv/Scripts/python.exe -m pytest ...`
+
 ## 运行测试
+
+> ⚠️ **Windows Git Bash 用户必读**：pytest 9.x 的默认输出捕获与 Git Bash 管道冲突，
+> 直接 `pytest` 会报 `ValueError: underlying buffer has been detached` 并显示 `collected 0 items`。
+> **请务必加 `-s`（或 `--capture=no`）禁用捕获**：
+>
+> ```bash
+> ./.venv/Scripts/python.exe -m pytest tests/ -s
+> ```
 
 ### 运行所有测试
 
 ```bash
-pytest
+pytest -s
 ```
 
 ### 运行特定测试文件
 
 ```bash
-pytest tests/integration/test_api_tasks.py
+pytest -s tests/integration/test_api_tasks.py
 ```
 
 ### 运行特定测试函数
 
 ```bash
-pytest tests/unit/test_utils.py::test_safe_get_nested_and_default
+pytest -s tests/unit/test_utils.py::test_safe_get_nested_and_default
 ```
 
 ### 生成覆盖率报告
 
 ```bash
-coverage run -m pytest
+coverage run -m pytest -s
 coverage report
 coverage html  # 生成 HTML 报告
 ```

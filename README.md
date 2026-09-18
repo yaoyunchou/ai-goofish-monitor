@@ -157,6 +157,33 @@ cd ai-goofish-monitor
 cp .env.example .env
 ```
 
+### 虚拟环境（推荐）
+
+项目依赖较多（Playwright、Pillow、psycopg 等），建议使用独立的虚拟环境，避免污染系统 Python。
+
+```bash
+# 创建虚拟环境（Python 3.11+）
+python -m venv .venv
+
+# 激活（Windows Git Bash / Linux / macOS）
+source .venv/Scripts/activate   # Windows
+source .venv/bin/activate       # Linux / macOS
+
+# 安装依赖
+python -m pip install -r requirements.txt
+```
+
+Windows 用户如使用 PowerShell / CMD，创建与激活方式为：
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1    # PowerShell
+.\.venv\Scripts\activate.bat    # CMD
+```
+
+> `.venv/` 已加入 `.gitignore`，不会被提交到版本库。
+> `start.sh` 会自动优先使用 `.venv`（存在时），无需手动激活。
+
 ### 一键启动
 
 ```bash
@@ -169,7 +196,7 @@ chmod +x start.sh
 ### 手动启动
 
 ```bash
-# 后端
+# 后端（已激活 .venv 时）
 python -m src.app
 # 或
 uvicorn src.app:app --host 0.0.0.0 --port 8000 --reload

@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import os
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Optional
@@ -87,33 +88,49 @@ def _cookie_changed(
     return current > (previous_mtime + 1e-6)
 
 
-class _FileLock:
-    def __init__(self, fh):
-        self._fh = fh
-
-    def __enter__(self):
-        try:
-            import fcntl
-
-            fcntl.flock(self._fh.fileno(), fcntl.LOCK_EX)
-        except Exception:
-            pass
-        return self
-
-    def __exit__(self, exc_type, exc, tb):
-        try:
-            import fcntl
-
-            fcntl.flock(self._fh.fileno(), fcntl.LOCK_UN)
-        except Exception:
-            pass
-        return False
-
-
 def _ensure_parent_dir(path: str) -> None:
     parent = os.path.dirname(path)
     if parent:
         os.makedirs(parent, exist_ok=True)
+
+
+try:
+    import fcntl  # POSIX 文件锁
+except ImportError:  # pragma: no cover - Windows
+    fcntl = None
+
+try:
+    import msvcrt  # Windows 文件锁
+except ImportError:  # pragma: no cover - POSIX
+    msvcrt = None
+
+
+@contextmanager
+def _locked_file(path: str):
+    """跨平台独占文件锁，锁由独立的 lock 文件承载。
+
+    使用独立的 `.lock` 文件而非目标文件本身：Windows 下锁定/占用目标文件会让
+    后续 `os.replace` 原子替换失败（WinError 5，文件被占用）。
+    """
+    _ensure_parent_dir(path)
+    lock_path = f"{path}.lock"
+    handle = open(lock_path, "a+", encoding="utf-8")
+    try:
+        if fcntl is not None:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        elif msvcrt is not None:
+            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+        yield handle
+    finally:
+        try:
+            if fcntl is not None:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            elif msvcrt is not None:
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        except OSError:
+            pass
+        handle.close()
 
 
 def _read_json_file(path: str) -> dict:
@@ -141,7 +158,6 @@ def _atomic_write_json(path: str, data: dict) -> None:
         f.flush()
         os.fsync(f.fileno())
     os.replace(tmp, path)
-
 
 @dataclass(frozen=True)
 class SkipDecision:
@@ -188,18 +204,16 @@ class FailureGuard:
 
     def _update_task(self, task_key: str, updater) -> dict:
         _ensure_parent_dir(self.path)
-        with open(self.path, "a+", encoding="utf-8") as fh:
-            with _FileLock(fh):
-                fh.seek(0)
-                data = self._load()
-                tasks = data.setdefault("tasks", {})
-                entry = tasks.get(task_key) or {}
-                if not isinstance(entry, dict):
-                    entry = {}
-                entry = updater(entry) or entry
-                tasks[task_key] = entry
-                self._save(data)
-                return entry
+        with _locked_file(self.path):
+            data = self._load()
+            tasks = data.setdefault("tasks", {})
+            entry = tasks.get(task_key) or {}
+            if not isinstance(entry, dict):
+                entry = {}
+            entry = updater(entry) or entry
+            tasks[task_key] = entry
+            self._save(data)
+            return entry
 
     def record_success(self, task_key: str, *, now: Optional[datetime] = None) -> None:
         def _reset(_: dict) -> dict:

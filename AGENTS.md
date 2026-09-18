@@ -7,7 +7,8 @@
 - 运行数据与资源：`prompts/`、`jsonl/`、`logs/`、`images/`、`static/`、`state/`，配置文件 `config.json` 与 `.env`（含 `DATABASE_URL`）位于仓库根目录。
 
 ## 构建、测试与本地开发
-- 后端开发：`python -m src.app` 或 `uvicorn src.app:app --host 0.0.0.0 --port 8000 --reload`。
+- **虚拟环境**：项目使用 `.venv`（Python 3.11+）。首次：`python -m venv .venv && source .venv/Scripts/activate && python -m pip install -r requirements.txt`（Linux/macOS 用 `.venv/bin/activate`）。`.venv/` 已在 `.gitignore` 中，勿提交。`start.sh` 会自动优先使用 `.venv`。
+- 后端开发：`python -m src.app` 或 `uvicorn src.app:app --host 0.0.0.0 --port 8000 --reload`（须在 `.venv` 激活状态下执行）。
 - 爬虫任务：`python spider_v2.py --task-name "MacBook Air M1" --debug-limit 3`（可用 `--config` 指定自定义配置）。
 - 前端开发：`cd web-ui && npm install && npm run dev`；构建：`cd web-ui && npm run build`（产物复制到根目录 `dist/`）。
 - 一键本地启动：`bash start.sh`（自动安装依赖、前端构建并启动后端）。

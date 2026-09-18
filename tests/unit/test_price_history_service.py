@@ -6,7 +6,9 @@ from src.services.price_history_service import (
 )
 
 
-def test_record_market_snapshots_and_build_price_history_insights(tmp_path, monkeypatch):
+def test_record_market_snapshots_and_build_price_history_insights(
+    tmp_path, monkeypatch, offline_db
+):
     monkeypatch.chdir(tmp_path)
     seen_item_ids = set()
 

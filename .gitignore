@@ -1,5 +1,8 @@
 .idea
 *.iml
+.venv/
+venv/
+env/
 xianyu_state.json
 .env
 .aider*
@@ -14,6 +17,7 @@ docs/exploration/temp_login_state.json
 config.json
 prompts/
 .serena/
+.workbuddy-ai/
 price_history/
 data/
 .env.202608*

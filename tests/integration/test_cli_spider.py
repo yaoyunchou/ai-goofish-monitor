@@ -11,7 +11,21 @@ def test_cli_runs_single_task_with_prompt(tmp_path, load_json_fixture, monkeypat
     async def placeholder_scrape(task_config, debug_limit):
         return 0
 
+    # spider_v2 会间接导入 seller_subscription_scraper / scraper_shop_datacompass，
+    # 它们从 src.scraper 取用的符号需一并补齐，否则 import 阶段即失败。
+    async def placeholder_launch_task_browser(task_config):
+        return None
+
+    async def placeholder_fetch_item_detail(context, item_link):
+        return {}
+
+    async def placeholder_scrape_user_profile(*args, **kwargs):
+        return {}
+
     fake_scraper.scrape_xianyu = placeholder_scrape
+    fake_scraper.launch_task_browser = placeholder_launch_task_browser
+    fake_scraper.fetch_item_detail = placeholder_fetch_item_detail
+    fake_scraper.scrape_user_profile = placeholder_scrape_user_profile
     monkeypatch.setitem(sys.modules, "src.scraper", fake_scraper)
     sys.modules.pop("spider_v2", None)
 
@@ -62,7 +76,21 @@ def test_cli_runs_keyword_mode_without_prompt_files(tmp_path, load_json_fixture,
     async def placeholder_scrape(task_config, debug_limit):
         return 0
 
+    # spider_v2 会间接导入 seller_subscription_scraper / scraper_shop_datacompass，
+    # 它们从 src.scraper 取用的符号需一并补齐，否则 import 阶段即失败。
+    async def placeholder_launch_task_browser(task_config):
+        return None
+
+    async def placeholder_fetch_item_detail(context, item_link):
+        return {}
+
+    async def placeholder_scrape_user_profile(*args, **kwargs):
+        return {}
+
     fake_scraper.scrape_xianyu = placeholder_scrape
+    fake_scraper.launch_task_browser = placeholder_launch_task_browser
+    fake_scraper.fetch_item_detail = placeholder_fetch_item_detail
+    fake_scraper.scrape_user_profile = placeholder_scrape_user_profile
     monkeypatch.setitem(sys.modules, "src.scraper", fake_scraper)
     sys.modules.pop("spider_v2", None)
 
