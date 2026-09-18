@@ -21,3 +21,6 @@ prompts/
 price_history/
 data/
 .env.202608*
+uv.lock
+.merge-backup-*/
+.merge-backup-pointer.txt
