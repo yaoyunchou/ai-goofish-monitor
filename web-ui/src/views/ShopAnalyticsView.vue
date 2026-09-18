@@ -1,32 +1,83 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { collectShopAnalytics, getShopDistribution, getShopOverview, getShopTrend } from '@/api/shopAnalytics'
+import {
+  getShopAnalyticsDashboard,
+  type ShopAnalyticsDashboard,
+  type ShopAnalyticsPeriod,
+} from '@/api/shopAnalytics'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
+import { formatShanghaiTime } from '@/lib/datetime'
+import WantViewTrendChart from '@/components/charts/WantViewTrendChart.vue'
+import ShopRankingTable from '@/components/shop-analytics/ShopRankingTable.vue'
+import HotItemsTable from '@/components/shop-analytics/HotItemsTable.vue'
 
 const { t } = useI18n()
-const cycle = ref('1d')
-const overview = ref<any>(null)
-const distributionType = ref('source')
-const distribution = ref<any[]>([])
-const trend = ref<any[]>([])
+const period = ref<ShopAnalyticsPeriod>('today')
+const dashboard = ref<ShopAnalyticsDashboard | null>(null)
 const isLoading = ref(false)
 const loadError = ref('')
 
-const hasData = computed(() => Boolean(overview.value?.metrics && Object.keys(overview.value.metrics).length))
+const hasData = computed(() => Boolean(dashboard.value?.has_data))
+const cards = computed(() => dashboard.value?.cards)
+const shopsMismatch = computed(() => {
+  const current = cards.value
+  if (!current) return false
+  return current.enabled_shop_count !== current.shops_with_data
+})
+const todayEmpty = computed(() => {
+  if (!dashboard.value?.has_data || period.value !== 'today') return false
+  return (cards.value?.item_count ?? 0) === 0
+})
+const freshnessText = computed(() => {
+  const freshness = dashboard.value?.freshness
+  const time = freshness?.last_captured_at || freshness?.last_run_at
+  if (!time) return ''
+  return t('shopAnalytics.freshness', { time: formatShanghaiTime(time) })
+})
+
+function formatCount(value: number | null | undefined) {
+  if (value === null || value === undefined) return '—'
+  return value.toLocaleString('zh-CN')
+}
 
 const metricCards = computed(() => {
-  const metrics = overview.value?.metrics || {}
-  const pick = (key: string) => metrics[key]?.value ?? metrics[key]?.display ?? '-'
+  const current = cards.value
+  const isRange = period.value === '7d'
+  const anchor = dashboard.value?.anchor_day
+  const anchorHint = isRange && anchor ? t('shopAnalytics.cardAnchor', { date: anchor }) : ''
   return [
-    { label: t('shopAnalytics.showPv'), value: pick('showPv') },
-    { label: t('shopAnalytics.ipv'), value: pick('ipv') },
-    { label: t('shopAnalytics.vstUv'), value: pick('vstUv') },
-    { label: t('shopAnalytics.payOrdCnt'), value: pick('payOrdCnt') },
-    { label: t('shopAnalytics.onlCnt'), value: pick('onlCnt') },
-    { label: t('shopAnalytics.uctr'), value: pick('uctr') },
+    {
+      key: 'shops',
+      label: t('shopAnalytics.cardShops'),
+      value: formatCount(current?.enabled_shop_count),
+      hint: t('shopAnalytics.tooltipShops'),
+      sub: '',
+    },
+    {
+      key: 'items',
+      label: isRange ? t('shopAnalytics.cardItemsRange') : t('shopAnalytics.cardItems'),
+      value: formatCount(current?.item_count),
+      hint: t('shopAnalytics.tooltipItems'),
+      sub: isRange && dashboard.value ? `${dashboard.value.range_start} ~ ${dashboard.value.range_end}` : '',
+    },
+    {
+      key: 'want',
+      label: isRange ? t('shopAnalytics.cardWantRange') : t('shopAnalytics.cardWant'),
+      value: formatCount(current?.want_sum),
+      hint: t('shopAnalytics.tooltipWant'),
+      sub: anchorHint,
+    },
+    {
+      key: 'view',
+      label: isRange ? t('shopAnalytics.cardViewRange') : t('shopAnalytics.cardView'),
+      value: formatCount(current?.view_sum),
+      hint: t('shopAnalytics.tooltipView'),
+      sub: anchorHint,
+    },
   ]
 })
 
@@ -34,22 +85,9 @@ async function load() {
   isLoading.value = true
   loadError.value = ''
   try {
-    const overviewRes = await getShopOverview(cycle.value)
-    overview.value = overviewRes
-    if (!overviewRes?.has_data) {
-      loadError.value = overviewRes?.empty_message || t('shopAnalytics.empty')
-      distribution.value = []
-      trend.value = []
-      return
-    }
-    const dist = await getShopDistribution(cycle.value, distributionType.value)
-    distribution.value = dist.items || []
-    const trendRes = await getShopTrend('showPv', 30, cycle.value)
-    trend.value = trendRes.points || []
+    dashboard.value = await getShopAnalyticsDashboard(period.value)
   } catch (e) {
-    overview.value = null
-    distribution.value = []
-    trend.value = []
+    dashboard.value = null
     const message = (e as Error).message || t('shopAnalytics.empty')
     loadError.value = message
     toast({ title: t('common.error'), description: message, variant: 'destructive' })
@@ -58,13 +96,10 @@ async function load() {
   }
 }
 
-async function collect() {
-  try {
-    const result = await collectShopAnalytics()
-    toast({ title: result.message || t('shopAnalytics.collectStarted') })
-  } catch (e) {
-    toast({ title: t('common.error'), description: (e as Error).message, variant: 'destructive' })
-  }
+function setPeriod(next: ShopAnalyticsPeriod) {
+  if (period.value === next) return
+  period.value = next
+  load()
 }
 
 onMounted(load)
@@ -76,64 +111,107 @@ onMounted(load)
       <div>
         <h1 class="text-2xl font-black text-slate-900">{{ t('shopAnalytics.title') }}</h1>
         <p class="text-sm text-slate-500">{{ t('shopAnalytics.description') }}</p>
+        <p v-if="freshnessText" class="mt-1 text-xs text-slate-400">{{ freshnessText }}</p>
       </div>
-      <div class="flex gap-2">
-        <Button variant="outline" @click="collect">{{ t('shopAnalytics.collect') }}</Button>
+      <div class="flex flex-wrap items-center gap-2">
+        <Button
+          v-for="item in (['today', '7d'] as ShopAnalyticsPeriod[])"
+          :key="item"
+          :variant="period === item ? 'default' : 'outline'"
+          @click="setPeriod(item)"
+        >
+          {{ item === 'today' ? t('shopAnalytics.periodToday') : t('shopAnalytics.period7d') }}
+        </Button>
         <Button @click="load">{{ t('common.refresh') }}</Button>
       </div>
     </div>
-    <div class="flex gap-2">
-      <Button v-for="item in ['1d', '7d', '30d']" :key="item" :variant="cycle === item ? 'default' : 'outline'" @click="cycle = item; load()">
-        {{ t(`shopAnalytics.cycle.${item}`) }}
-      </Button>
-    </div>
+
     <Card v-if="loadError" class="app-surface border border-amber-200 bg-amber-50">
       <CardContent class="p-5 text-sm text-amber-900">
         {{ loadError }}
       </CardContent>
     </Card>
-    <div v-else-if="hasData" class="grid gap-4 md:grid-cols-3">
-      <Card v-for="card in metricCards" :key="card.label" class="app-surface border-none">
-        <CardContent class="p-5">
-          <p class="text-xs uppercase tracking-widest text-slate-400">{{ card.label }}</p>
-          <p class="mt-2 text-2xl font-black text-slate-800">{{ card.value }}</p>
+
+    <Card v-else-if="isLoading && !dashboard" class="app-surface border-none">
+      <CardContent class="py-10 text-center text-sm text-slate-400">
+        {{ t('common.loading') }}
+      </CardContent>
+    </Card>
+
+    <Card v-else-if="!hasData" class="app-surface border-none">
+      <CardContent class="space-y-4 py-10 text-center">
+        <p class="text-base font-semibold text-slate-800">{{ t('shopAnalytics.empty') }}</p>
+        <p class="text-sm text-slate-500">{{ t('shopAnalytics.emptyHint') }}</p>
+        <div class="flex flex-wrap items-center justify-center gap-3">
+          <Button as-child>
+            <RouterLink to="/seller-subscriptions/collection">
+              {{ t('shopAnalytics.goCollection') }}
+            </RouterLink>
+          </Button>
+          <RouterLink
+            to="/seller-subscriptions/sellers"
+            class="text-sm text-primary underline-offset-4 hover:underline"
+          >
+            {{ t('shopAnalytics.goSellers') }}
+          </RouterLink>
+        </div>
+      </CardContent>
+    </Card>
+
+    <template v-else>
+      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Card v-for="card in metricCards" :key="card.key" class="app-surface border-none" :title="card.hint">
+          <CardContent class="p-5">
+            <p class="text-xs uppercase tracking-widest text-slate-400">{{ card.label }}</p>
+            <p class="mt-2 text-2xl font-black text-slate-800">{{ card.value }}</p>
+            <p v-if="card.sub" class="mt-1 text-xs text-slate-400">{{ card.sub }}</p>
+          </CardContent>
+        </Card>
+      </div>
+      <p v-if="shopsMismatch" class="text-xs text-slate-500">
+        {{
+          t('shopAnalytics.shopsMismatch', {
+            enabled: cards?.enabled_shop_count ?? 0,
+            withData: cards?.shops_with_data ?? 0,
+          })
+        }}
+      </p>
+      <p v-if="todayEmpty" class="text-xs text-amber-700">{{ t('shopAnalytics.todayEmpty') }}</p>
+
+      <Card class="app-surface border-none">
+        <CardHeader>
+          <CardTitle>{{ t('shopAnalytics.trendTitle') }}</CardTitle>
+          <p class="text-xs font-normal text-slate-400">{{ t('shopAnalytics.trendHint') }}</p>
+        </CardHeader>
+        <CardContent>
+          <WantViewTrendChart
+            :points="dashboard?.trend || []"
+            :dual-axis="true"
+            :connect-nulls="false"
+            :title="t('shopAnalytics.trendTitle')"
+          />
         </CardContent>
       </Card>
-    </div>
-    <Card v-else class="app-surface border-none">
-      <CardContent class="py-10 text-center text-sm text-slate-400">
-        {{ isLoading ? t('common.loading') : t('shopAnalytics.empty') }}
-      </CardContent>
-    </Card>
-    <Card class="app-surface border-none">
-      <CardHeader class="flex flex-row items-center justify-between">
-        <CardTitle>{{ t('shopAnalytics.distribution') }}</CardTitle>
-        <select v-model="distributionType" class="h-9 rounded-md border px-2 text-sm" @change="load">
-          <option value="source">{{ t('shopAnalytics.source') }}</option>
-          <option value="category">{{ t('shopAnalytics.category') }}</option>
-          <option value="time">{{ t('shopAnalytics.time') }}</option>
-          <option value="region">{{ t('shopAnalytics.region') }}</option>
-        </select>
-      </CardHeader>
-      <CardContent>
-        <p v-if="isLoading" class="text-sm text-slate-500">{{ t('common.loading') }}</p>
-        <ul v-else class="space-y-2 text-sm">
-          <li v-for="item in distribution" :key="item.label" class="flex justify-between border-b border-slate-100 py-2">
-            <span>{{ item.label }}</span>
-            <span>{{ item.ratio_format || item.count }}</span>
-          </li>
-          <li v-if="!distribution.length" class="py-6 text-center text-slate-400">{{ t('shopAnalytics.empty') }}</li>
-        </ul>
-      </CardContent>
-    </Card>
-    <Card class="app-surface border-none">
-      <CardHeader>
-        <CardTitle>{{ t('shopAnalytics.trend') }}</CardTitle>
-      </CardHeader>
-      <CardContent class="text-sm text-slate-600">
-        <p v-for="point in trend" :key="point.date">{{ point.date }} · showPv {{ point.value ?? '-' }}</p>
-        <p v-if="!trend.length" class="py-6 text-center text-slate-400">{{ t('shopAnalytics.empty') }}</p>
-      </CardContent>
-    </Card>
+
+      <Card class="app-surface border-none">
+        <CardHeader>
+          <CardTitle>{{ t('shopAnalytics.rankingTitle') }}</CardTitle>
+          <p class="text-xs font-normal text-slate-400">{{ t('shopAnalytics.rankingHint') }}</p>
+        </CardHeader>
+        <CardContent>
+          <ShopRankingTable :rows="dashboard?.shops || []" />
+        </CardContent>
+      </Card>
+
+      <Card class="app-surface border-none">
+        <CardHeader>
+          <CardTitle>{{ t('shopAnalytics.hotTitle') }}</CardTitle>
+          <p class="text-xs font-normal text-slate-400">{{ t('shopAnalytics.hotHint') }}</p>
+        </CardHeader>
+        <CardContent>
+          <HotItemsTable :rows="dashboard?.hot_items || []" />
+        </CardContent>
+      </Card>
+    </template>
   </div>
 </template>

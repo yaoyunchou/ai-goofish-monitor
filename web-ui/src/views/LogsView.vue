@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { computed, ref, watch, nextTick, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useLogs } from '@/composables/useLogs'
 import { useTasks } from '@/composables/useTasks'
+import { getSellerSubscriptionStats } from '@/api/sellerSubscriptions'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
@@ -11,16 +13,47 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from '@/components/ui/toast'
 
+const SELLER_SUBSCRIPTION_LOG_ID = '-1'
+
 const { t } = useI18n()
+const route = useRoute()
 const { tasks } = useTasks()
 const { logs, isAutoRefresh, clearLogs, toggleAutoRefresh, fetchLogs, setTaskId, loadLatest, loadPrevious, isFetchingHistory, hasMoreHistory } = useLogs()
 const logContainer = ref<HTMLElement | null>(null)
 const autoScroll = ref(true)
 const isClearDialogOpen = ref(false)
 const selectedTaskId = ref('')
+const sellerSubscriptionRunning = ref(false)
 const isPrepending = ref(false)
 const lastScrollTop = ref(0)
 const lastScrollHeight = ref(0)
+
+const logSources = computed(() => {
+  const sources = [
+    {
+      id: SELLER_SUBSCRIPTION_LOG_ID,
+      label: t('logs.sellerSubscription'),
+      isRunning: sellerSubscriptionRunning.value,
+    },
+  ]
+  for (const task of tasks.value) {
+    sources.push({
+      id: String(task.id),
+      label: task.task_name,
+      isRunning: Boolean(task.is_running),
+    })
+  }
+  return sources
+})
+
+async function refreshSellerSubscriptionStatus() {
+  try {
+    const stats = await getSellerSubscriptionStats()
+    sellerSubscriptionRunning.value = Boolean(stats.schedule?.is_running)
+  } catch {
+    sellerSubscriptionRunning.value = false
+  }
+}
 
 // Auto-scroll logic
 watch(logs, async () => {
@@ -40,29 +73,50 @@ watch(logs, async () => {
 })
 
 watch(tasks, (list) => {
+  if (selectedTaskId.value === SELLER_SUBSCRIPTION_LOG_ID) {
+    return
+  }
   if (!list.length) {
-    selectedTaskId.value = ''
-    setTaskId(null)
+    if (!selectedTaskId.value) {
+      selectedTaskId.value = SELLER_SUBSCRIPTION_LOG_ID
+    }
     return
   }
   if (selectedTaskId.value && list.some((task) => String(task.id) === selectedTaskId.value)) {
     return
   }
+  if (sellerSubscriptionRunning.value) {
+    selectedTaskId.value = SELLER_SUBSCRIPTION_LOG_ID
+    return
+  }
   const running = list.find((task) => task.is_running)
   const fallback = list[0]
   if (!fallback) {
-    selectedTaskId.value = ''
-    setTaskId(null)
+    selectedTaskId.value = SELLER_SUBSCRIPTION_LOG_ID
     return
   }
   selectedTaskId.value = String(running ? running.id : fallback.id)
 }, { immediate: true })
 
+onMounted(async () => {
+  await refreshSellerSubscriptionStatus()
+  if (route.query.source === 'seller-subscription') {
+    selectedTaskId.value = SELLER_SUBSCRIPTION_LOG_ID
+  } else if (!selectedTaskId.value) {
+    selectedTaskId.value = sellerSubscriptionRunning.value
+      ? SELLER_SUBSCRIPTION_LOG_ID
+      : (tasks.value[0] ? String(tasks.value[0].id) : SELLER_SUBSCRIPTION_LOG_ID)
+  }
+})
+
 watch(selectedTaskId, (taskId) => {
   const resolvedTaskId = taskId ? Number(taskId) : null
   setTaskId(resolvedTaskId)
-  if (resolvedTaskId) {
+  if (resolvedTaskId !== null) {
     loadLatest(50)
+  }
+  if (taskId === SELLER_SUBSCRIPTION_LOG_ID) {
+    refreshSellerSubscriptionStatus()
   }
 })
 
@@ -115,8 +169,12 @@ async function handleClearLogs() {
               <SelectValue :placeholder="t('logs.selectTask')" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem v-for="task in tasks" :key="task.id" :value="String(task.id)">
-                {{ task.task_name }}{{ task.is_running ? t('logs.taskRunningSuffix') : '' }}
+              <SelectItem
+                v-for="source in logSources"
+                :key="source.id"
+                :value="source.id"
+              >
+                {{ source.label }}{{ source.isRunning ? t('logs.taskRunningSuffix') : '' }}
               </SelectItem>
             </SelectContent>
           </Select>

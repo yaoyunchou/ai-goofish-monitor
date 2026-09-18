@@ -204,6 +204,10 @@ class FailureGuard:
 
     def _update_task(self, task_key: str, updater) -> dict:
         _ensure_parent_dir(self.path)
+        entry: dict
+        data: dict
+        # 锁由独立的 `.lock` 文件承载，目标文件在锁期间不被持有；
+        # 释放锁后再做原子替换，避免 Windows 下 os.replace 撞上文件占用（WinError 5）。
         with _locked_file(self.path):
             data = self._load()
             tasks = data.setdefault("tasks", {})
@@ -212,8 +216,9 @@ class FailureGuard:
                 entry = {}
             entry = updater(entry) or entry
             tasks[task_key] = entry
-            self._save(data)
-            return entry
+        # Close the file before atomic replace; Windows rejects os.replace on open files.
+        self._save(data)
+        return entry
 
     def record_success(self, task_key: str, *, now: Optional[datetime] = None) -> None:
         def _reset(_: dict) -> dict:

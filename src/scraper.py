@@ -5,7 +5,7 @@ import sys
 import random
 from datetime import datetime
 from typing import Optional
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 from playwright.async_api import (
     Response,
@@ -341,13 +341,71 @@ def _build_context_overrides(snapshot: dict) -> dict:
 def _build_extra_headers(raw_headers: Optional[dict]) -> dict:
     if not raw_headers:
         return {}
-    excluded = {"cookie", "content-length"}
+    excluded = {
+        "cookie",
+        "content-length",
+        "host",
+        "connection",
+        "referer",
+        "origin",
+        "sec-fetch-site",
+        "sec-fetch-mode",
+        "sec-fetch-dest",
+        "sec-fetch-user",
+    }
     headers = {}
     for key, value in raw_headers.items():
         if not key or key.lower() in excluded or value is None:
             continue
         headers[key] = value
     return headers
+
+
+def _is_extension_snapshot(snapshot: dict) -> bool:
+    return any(key in snapshot for key in ("env", "headers", "page", "storage"))
+
+
+def _snapshot_to_playwright_storage(snapshot: dict) -> dict:
+    """将 Chrome 扩展导出的增强快照转为 Playwright storage_state（含 localStorage）。"""
+    cookies = snapshot.get("cookies") or []
+    storage = snapshot.get("storage") or {}
+    page_url = snapshot.get("pageUrl") or (snapshot.get("page") or {}).get("pageUrl")
+    origin = "https://www.goofish.com"
+    if isinstance(page_url, str) and page_url.startswith("http"):
+        parsed = urlparse(page_url)
+        if parsed.scheme and parsed.netloc:
+            origin = f"{parsed.scheme}://{parsed.netloc}"
+
+    local_storage = [
+        {"name": str(key), "value": str(value)}
+        for key, value in (storage.get("local") or {}).items()
+    ]
+    session_storage = [
+        {"name": str(key), "value": str(value)}
+        for key, value in (storage.get("session") or {}).items()
+    ]
+    origins: list[dict] = []
+    if local_storage or session_storage:
+        origin_entry: dict = {"origin": origin, "localStorage": local_storage}
+        if session_storage:
+            origin_entry["sessionStorage"] = session_storage
+        origins.append(origin_entry)
+    return {"cookies": cookies, "origins": origins}
+
+
+def _prepare_browser_context_from_snapshot(
+    snapshot_data: dict | None,
+    state_file: str,
+) -> tuple[object, dict]:
+    context_kwargs = _default_context_options()
+    storage_state_arg: object = state_file
+    if isinstance(snapshot_data, dict):
+        if _is_extension_snapshot(snapshot_data):
+            storage_state_arg = _snapshot_to_playwright_storage(snapshot_data)
+            context_kwargs.update(_build_context_overrides(snapshot_data))
+        else:
+            storage_state_arg = snapshot_data
+    return storage_state_arg, _clean_kwargs(context_kwargs)
 
 
 async def scrape_user_profile(
@@ -514,6 +572,7 @@ async def fetch_item_detail(context, item_link: str) -> dict:
         image_urls = [img.get("url") for img in image_infos if isinstance(img, dict) and img.get("url")]
         result.update({
             "ok": True,
+            "detail_api_raw": detail_json,
             "item_do": item_do,
             "seller_do": seller_do,
             "“想要”人数": await safe_get(item_do, "wantCnt", default=None),
@@ -527,8 +586,15 @@ async def fetch_item_detail(context, item_link: str) -> dict:
         await detail_page.close()
 
 
+def _resolve_headless(task_config: dict | None) -> bool:
+    if isinstance(task_config, dict) and "run_headless" in task_config:
+        return bool(task_config.get("run_headless"))
+    return RUN_HEADLESS
+
+
 async def launch_task_browser(task_config: dict):
     """创建 Playwright browser/context，供订阅/店铺采集复用。返回 (p, browser, context, state_file)。"""
+    run_headless = _resolve_headless(task_config)
     rotation_settings = _get_rotation_settings(task_config)
     account_items = load_state_files(rotation_settings["account_state_dir"])
     runtime_plan = resolve_account_runtime_plan(
@@ -566,25 +632,20 @@ async def launch_task_browser(task_config: dict):
         "--disable-features=IsolateOrigins,site-per-process",
     ]
     launch_kwargs = {
-        "headless": RUN_HEADLESS,
+        "headless": run_headless,
         "args": launch_args,
         "channel": _resolve_browser_channel(),
     }
+    if not run_headless:
+        print("   [浏览器] 卖家订阅/店铺采集使用有头模式（无头模式可能无法加载用户主页 API）")
     browser = await playwright.chromium.launch(**launch_kwargs)
-    context_kwargs = _default_context_options()
-    storage_state_arg = state_file
-    if isinstance(snapshot_data, dict):
-        if any(key in snapshot_data for key in ("env", "headers", "page", "storage")):
-            storage_state_arg = {"cookies": snapshot_data.get("cookies", [])}
-            context_kwargs.update(_build_context_overrides(snapshot_data))
-            extra_headers = _build_extra_headers(snapshot_data.get("headers"))
-            if extra_headers:
-                context_kwargs["extra_http_headers"] = extra_headers
-        else:
-            storage_state_arg = snapshot_data
+    storage_state_arg, context_kwargs = _prepare_browser_context_from_snapshot(
+        snapshot_data,
+        state_file,
+    )
     context = await browser.new_context(
         storage_state=storage_state_arg,
-        **_clean_kwargs(context_kwargs),
+        **context_kwargs,
     )
     await context.add_init_script("""
         Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
@@ -719,26 +780,13 @@ async def scrape_xianyu(task_config: dict, debug_limit: int = 0):
 
             browser = await p.chromium.launch(**launch_kwargs)
 
-            context_kwargs = _default_context_options()
-            storage_state_arg = state_file
+            storage_state_arg, context_kwargs = _prepare_browser_context_from_snapshot(
+                snapshot_data,
+                state_file,
+            )
             analysis_dispatcher: Optional[ItemAnalysisDispatcher] = None
-
-            if isinstance(snapshot_data, dict):
-                # 新版扩展导出的增强快照，包含环境和Header
-                if any(
-                    key in snapshot_data
-                    for key in ("env", "headers", "page", "storage")
-                ):
-                    print(f"检测到增强浏览器快照，应用环境参数: {state_file}")
-                    storage_state_arg = {"cookies": snapshot_data.get("cookies", [])}
-                    context_kwargs.update(_build_context_overrides(snapshot_data))
-                    extra_headers = _build_extra_headers(snapshot_data.get("headers"))
-                    if extra_headers:
-                        context_kwargs["extra_http_headers"] = extra_headers
-                else:
-                    storage_state_arg = snapshot_data
-
-            context_kwargs = _clean_kwargs(context_kwargs)
+            if isinstance(snapshot_data, dict) and _is_extension_snapshot(snapshot_data):
+                print(f"检测到增强浏览器快照，应用 cookies/localStorage: {state_file}")
             context = await browser.new_context(
                 storage_state=storage_state_arg, **context_kwargs
             )

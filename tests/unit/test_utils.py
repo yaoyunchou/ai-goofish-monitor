@@ -53,7 +53,11 @@ def test_save_to_jsonl(tmp_path, monkeypatch, offline_db):
     )
     assert len(records) == 1
     # 存储层会附加可见性元数据（_status/_effective_hidden/...），业务字段须原样往返
-    stored = {key: value for key, value in records[0].items() if not key.startswith("_")}
+    stored = {
+        key: value
+        for key, value in records[0].items()
+        if not str(key).startswith("_")
+    }
     assert stored == record
     assert records[0]["_status"] == "active"
     assert records[0]["_effective_hidden"] is False

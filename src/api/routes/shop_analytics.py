@@ -2,7 +2,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from src.api.dependencies import get_process_service, get_task_service
+from src.domain.shop_analytics_dashboard import ShopAnalyticsPeriod
 from src.services.process_service import ProcessService
+from src.services.shop_analytics_dashboard_storage import get_subscription_dashboard
 from src.services.shop_datacompass_storage import list_latest_by_cycle, list_metric_trend
 from src.services.task_service import TaskService
 
@@ -35,6 +37,11 @@ def _merge_overview(rows: list[dict]) -> dict:
         "metrics": metrics,
         "distribution": distribution or {},
     }
+
+
+@router.get("/dashboard")
+async def get_dashboard(period: ShopAnalyticsPeriod = Query("today")):
+    return await get_subscription_dashboard(period)
 
 
 @router.get("/overview")

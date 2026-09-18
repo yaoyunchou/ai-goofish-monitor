@@ -95,10 +95,16 @@ def _load_blacklist_keywords_from_conn(conn, filename: str) -> list[str]:
     ).fetchone()
     if row is None:
         return []
-    try:
-        payload = json.loads(row["blacklist_keywords_json"] or "[]")
-    except json.JSONDecodeError:
+    raw = row["blacklist_keywords_json"]
+    if raw is None:
         return []
+    if isinstance(raw, list):
+        payload = raw
+    else:
+        try:
+            payload = json.loads(raw or "[]")
+        except (json.JSONDecodeError, TypeError):
+            return []
     return normalize_blacklist_keywords(payload)
 
 

@@ -126,9 +126,11 @@ def test_get_ai_analysis_stops_after_internal_retries_when_content_is_none(
 ):
     monkeypatch.chdir(tmp_path)
     call_count = {"value": 0}
+    seen_kwargs: list[dict] = []
 
-    async def fake_call(**_kwargs):
+    async def fake_call(**kwargs):
         call_count["value"] += 1
+        seen_kwargs.append(kwargs)
         return ""
 
     _install_fake_client(monkeypatch, fake_call)
@@ -143,6 +145,8 @@ def test_get_ai_analysis_stops_after_internal_retries_when_content_is_none(
         )
 
     assert call_count["value"] == 4
+    # 结构化输出开关需随调用一并下发
+    assert all(kwargs["enable_json_output"] is True for kwargs in seen_kwargs)
 
 
 def test_get_ai_analysis_retries_when_response_is_not_valid_json(monkeypatch, tmp_path):
@@ -179,7 +183,10 @@ def test_get_ai_analysis_recovers_when_later_attempt_returns_valid_json(
         state["count"] += 1
         if state["count"] == 1:
             return "这不是 JSON"
-        return VALID_PAYLOAD
+        return (
+            '{"prompt_version":"v1","is_recommended":true,'
+            '"reason":"ok","risk_tags":[],"criteria_analysis":{"seller_type":"个人"}}'
+        )
 
     fake = _install_fake_client(monkeypatch, fake_call)
 
@@ -194,6 +201,7 @@ def test_get_ai_analysis_recovers_when_later_attempt_returns_valid_json(
     assert result["reason"] == "ok"
     assert state["count"] == 2
     assert len(fake.calls) == 2
+    # 重试时温度应下调，避免模型重复给出同样的非法输出
     assert fake.calls[0]["temperature"] == 0.1
     assert fake.calls[1]["temperature"] == 0.05
 

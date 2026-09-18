@@ -35,7 +35,7 @@ function extractErrorDetail(data: unknown, status: number): string {
   return `HTTP error! status: ${status}`
 }
 
-export async function http(url: string, options: FetchOptions = {}) {
+export async function http<T = unknown>(url: string, options: FetchOptions = {}): Promise<T> {
   const { logout } = useAuth()
 
   const headers = new Headers(options.headers)
@@ -73,8 +73,8 @@ export async function http(url: string, options: FetchOptions = {}) {
   }
 
   if (response.status === 204) {
-    return null
+    return null as T
   }
 
-  return data
+  return data as T
 }

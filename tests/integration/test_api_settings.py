@@ -7,6 +7,10 @@ from src.infrastructure.config.env_manager import env_manager
 
 
 _SETTINGS_ENV_KEYS = [
+    "AI_PROVIDER",
+    "CURSOR_API_KEY",
+    "CURSOR_AGENT",
+    "CURSOR_RUNTIME",
     "ACCOUNT_ROTATION_ENABLED",
     "ACCOUNT_ROTATION_MODE",
     "ACCOUNT_ROTATION_RETRY_LIMIT",
@@ -431,6 +435,7 @@ def test_ai_test_endpoint_falls_back_to_responses_when_chat_completions_api_404(
     response = client.post(
         "/api/settings/ai/test",
         json={
+            "AI_PROVIDER": "openai",
             "OPENAI_API_KEY": "demo",
             "OPENAI_BASE_URL": "https://example.com/v1/",
             "OPENAI_MODEL_NAME": "demo-model",

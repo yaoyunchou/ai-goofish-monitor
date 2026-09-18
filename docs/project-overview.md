@@ -3,7 +3,7 @@
 > 本文档是 `ai-goofish-monitor`（闲鱼智能监控系统）的**全貌说明**，面向初次接触项目的读者，帮助你快速理解：这是一个什么样的项目、它解决什么问题、由哪些部分组成、核心概念与数据流是什么。
 >
 > 更深入的内容请参阅：
-> - [架构文档](./architecture.md) — 分层架构、模块设计、数据模型、并发模型
+> - [系统架构](./design/architecture.md) — 分层架构、模块设计、数据模型、并发模型
 > - [功能文档](./features.md) — 前后端全部功能点、API 端点清单、配置项详解
 
 ---
@@ -36,6 +36,8 @@
 | 数据导出 | 结果一键导出 CSV / NDJSON |
 | 多语言 | Web UI 支持简体中文与英文 |
 | Docker 一键部署 | 多架构（amd64/arm64）镜像，内置 Chromium |
+| 卖家订阅 | 独立 CRUD + Cron；C 端主页采集；想要/浏览量追踪 |
+| 店铺数据罗盘 | 卖家工作台 datacompass；1/7/30 天周期可视化 |
 
 ---
 
@@ -60,7 +62,7 @@ ai-goofish-monitor/
 
 ### 2.1 后端（FastAPI + Playwright）
 
-后端是系统的大脑，采用**分层架构**（详见[架构文档](./architecture.md)）：
+后端是系统的大脑，采用**分层架构**（详见[架构文档](./design/architecture.md)）：
 
 - **API 层** `src/api/routes/`：对外暴露 REST API 与 WebSocket
 - **服务层** `src/services/`：业务逻辑（任务、进程、调度、AI、通知、结果、收藏等 28 个模块）
@@ -74,7 +76,7 @@ ai-goofish-monitor/
 
 ### 2.2 前端（Vue 3）
 
-基于 Vue 3 + TypeScript + Vite + Tailwind CSS + shadcn-vue 风格的 SPA，提供 8 个页面（监控概览、任务管理、账号管理、结果浏览、收藏详情、运行日志、系统设置、登录）。通过 REST API 与 WebSocket 与后端实时交互（任务状态、结果更新会实时推送到前端）。
+基于 Vue 3 + TypeScript + Vite + Tailwind CSS + shadcn-vue 风格的 SPA，提供 **13 个路由页面**（监控概览、任务、账号、结果、收藏详情、卖家订阅 5 页、店铺数据罗盘、日志、设置、登录）。通过 REST API 与 WebSocket 与后端实时交互。
 
 ### 2.3 Chrome 扩展（登录态导出）
 
@@ -355,9 +357,9 @@ docker compose up -d
 | 文档 | 内容 |
 |------|------|
 | **本文档** | 项目全貌、技术栈、目录、核心概念、数据流、发展历程 |
-| [架构文档](./architecture.md) | 分层架构、模块职责、数据模型、并发与进程模型、配置体系、设计决策 |
+| [架构文档](./design/architecture.md) | 分层架构、模块职责、数据模型、并发与进程模型、配置体系、设计决策 |
 | [功能文档](./features.md) | 前后端功能点清单、API 端点表、任务配置、通知渠道、命令行、测试 |
 | [用户使用指南](./user-guide.md) | 安装、配置、日常使用（面向使用者） |
 | [AI 提供方配置](./ai-provider.md) | OpenAI 兼容接口与 Cursor SDK 切换 |
 | [闲鱼 Cookie 获取指南](./getting-xianyu-cookies.md) | 登录态获取与导入 |
-| [数据库接入指南](./database-supabase-integration.md) | Supabase/PostgreSQL 接入 |
+| [数据库接入指南](./design/database-supabase-integration.md) | Supabase/PostgreSQL 接入 |

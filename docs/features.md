@@ -38,6 +38,8 @@
 | 账号体系 | 登录态导入/更新/删除、策略 auto/fixed/rotate、代理池轮换 |
 | 稳定性 | 失败熔断、自动恢复、任务日志清理 |
 | 运维 | Docker 多架构部署、CI 自动发镜像、健康检查、数据库自检 |
+| 卖家订阅 | 独立 CRUD + 全局 Cron；C 端主页采集；仅入库同时有「想要+浏览量」的商品 |
+| 店铺分析 | 订阅日指标看板（今天/近7天）：想要/浏览、店排行、热门商品；旧 datacompass 接口保留但不作主页面数据源 |
 
 ---
 
@@ -128,6 +130,33 @@
 - **WebSocket 实时刷新**：任务状态、结果、仪表盘数据变化即时更新
 - **移动端适配**：侧边抽屉导航、卡片式列表
 - **主题**：Tailwind CSS 变量驱动，亮/暗模式
+
+### 2.10 卖家订阅（SellerSubscriptionView 等）
+
+| 路由 | 页面 | 功能 |
+|------|------|------|
+| `/seller-subscriptions/sellers` | 卖家列表 | 订阅 CRUD、启用/禁用、全局 Cron 配置、手动触发采集 |
+| `/seller-subscriptions/sellers/:sellerUserId` | 卖家详情 | 画像快照、在售商品概览 |
+| `/seller-subscriptions/items` | 商品列表 | 分页/搜索/排序（想要数、浏览量、价格、快照时间） |
+| `/seller-subscriptions/items/:itemId` | 商品详情 | 指标趋势、详情 API 快照、「查看原页面」跳转闲鱼 |
+| `/seller-subscriptions/collection` | 采集控制台 | 采集进度与统计；调度配置含 Cron、每店上限、**无头模式**（`run_headless`） |
+
+**推荐路径**：使用独立 `seller_subscriptions` 表 + `/api/seller-subscriptions`（与任务管理的 `task_type=seller_subscription` 解耦）。采集入口：`POST /api/seller-subscriptions/run` 或 Cron 调度。
+
+**入库规则**：仅当商品同时具有「想要人数」和「浏览量」时写入日级表：`seller_subscription_items`（静态）+ `seller_item_daily_metrics`（want/view，每日一条）+ `crawl_raw_records`（原始 JSON，与日指标 1:1）。同日再次采集覆盖，不新增行。
+
+### 2.11 店铺分析（ShopAnalyticsView，`/shop-analytics`）
+
+侧栏仍叫「店铺数据」。页内标题为 **店铺分析**，主数据源是卖家订阅日指标（`seller_item_daily_metrics`），不是工作台 datacompass。
+
+- 周期：默认 **今天**（Asia/Shanghai），可切换 **近 7 天**
+- 概览卡片：订阅店数（仅 enabled）、已采商品去重、想要合计、浏览合计。近 7 天的想要/浏览取区间内最新有数据日，**不跨日相加**
+- 趋势图：始终近 7 个上海日历日；无数据日空心（JSON `null`，不补 0）
+- 店铺排行（默认浏览降序，表头可改排序）→ 卖家详情；热门商品 Top 10 → 商品详情
+- 刷新只重新 `GET /api/shop-analytics/dashboard`；本页不触发采集
+- 无日指标时引导去 **采集控制台** `/seller-subscriptions/collection`（次链卖家列表）
+
+**口径**：监控商品 = 指定日（或区间）日指标去重 `item_id`，不是画像 `item_count`，也不是全库跨日去重。旧 `GET /overview` 等 datacompass 接口仍保留给首页/兼容，主页面不再调用。
 
 ---
 
@@ -240,6 +269,34 @@
 | 端点 | 事件 |
 |------|------|
 | `/ws` | `task_status_changed`、`tasks_updated`、`results_updated` |
+
+### 3.12 卖家订阅（`/api/seller-subscriptions`）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/seller-subscriptions` | 订阅列表（含概览） |
+| POST | `/api/seller-subscriptions` | 添加订阅 |
+| PATCH | `/api/seller-subscriptions/schedule` | 更新全局 Cron/限额/账号策略 |
+| POST | `/api/seller-subscriptions/run` | 手动启动采集子进程 |
+| PATCH | `/api/seller-subscriptions/{id}` | 更新单条订阅 |
+| DELETE | `/api/seller-subscriptions/{id}` | 删除订阅 |
+| GET | `/api/seller-subscriptions/profiles` | 最新卖家画像列表 |
+| GET | `/api/seller-subscriptions/items` | 商品分页列表（`seller_id`/`search`/`sort_by`/`sort_order`） |
+| GET | `/api/seller-subscriptions/items/{item_id}/detail` | 商品详情（指标 + 详情 API） |
+| GET | `/api/seller-subscriptions/detail/{seller_user_id}` | 卖家订阅 + 画像 |
+| GET | `/api/seller-subscriptions/metrics` | 商品指标时序 |
+| GET | `/api/seller-subscriptions/stats` | 统计（卖家数/商品数/调度配置） |
+
+### 3.13 店铺分析（`/api/shop-analytics`）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/shop-analytics/dashboard` | **主看板**（`period=today\|7d`，默认 today）；订阅日指标聚合 |
+| GET | `/api/shop-analytics/overview` | 旧 datacompass 概览（`cycle=1d\|7d\|30d`），主页面不再调用 |
+| GET | `/api/shop-analytics/flow` | 旧流量明细 |
+| GET | `/api/shop-analytics/distribution` | 旧分布（`type=source\|category\|time\|region`） |
+| GET | `/api/shop-analytics/trend` | 旧指标趋势（`metric`、`days`、`cycle`） |
+| POST | `/api/shop-analytics/collect` | 触发 datacompass 采集任务（本页 UI 不调用） |
 
 ---
 
@@ -444,9 +501,12 @@ Webhook 模板变量：`{{title}}`、`{{content}}`、`{{price}}`、`{{reason}}`�
 ```bash
 python spider_v2.py                          # 运行所有启用任务（从数据库读取）
 python spider_v2.py --task-name "MacBook"    # 运行指定任务（调度器/Web 启动用）
+python spider_v2.py --seller-subscriptions   # 运行卖家订阅采集（独立子进程入口）
 python spider_v2.py --debug-limit 3          # 调试模式：每任务最多处理 3 个新商品
 python spider_v2.py --config custom.json     # 使用 JSON 配置文件（兼容旧版）
 ```
+
+`task_type` 分支：`keyword_search`（默认）| `seller_subscription` | `shop_datacompass`。
 
 行为要点：
 - 无 `--config` 时从 `create_task_repository()` 读取任务（Postgres）
@@ -560,27 +620,33 @@ python3 -m scripts.check_env_keys                  # 检查环境变量是否注
 
 | 层级 | 目录 | 内容 |
 |------|------|------|
-| 单元测试 | `tests/unit/`（28 个文件） | AI 客户端、解析器、关键词引擎、通知、轮换、失败保护、配置等 |
-| 集成测试 | `tests/integration/`（6 个） | 任务/结果/设置/仪表盘 API、CLI、解析管道 |
-| Live 冒烟 | `tests/live/`（3 个，默认关闭） | 真实账号+真实 AI+真实流量的端到端验证（`RUN_LIVE_TESTS=1`） |
+| 单元测试 | `tests/unit/`（约 40 个文件） | AI、解析、关键词、卖家订阅、店铺罗盘、失败保护等 |
+| 集成测试 | `tests/integration/`（11 个） | tasks/results/settings/dashboard/seller-subscriptions/shop-analytics/accounts/collections/logs API、CLI、解析管道 |
+| Live 冒烟 | `tests/live/`（3 个，默认 skip） | 真实账号+AI+流量（`RUN_LIVE_TESTS=1`） |
+| 前端 smoke | `web-ui/src/**/*.test.ts`（9 个） | 路由、i18n、工具函数（Vitest） |
 | 根级 | `tests/` | FailureGuard、前端构建路径 |
-| 替身 | `tests/fakes/memory_task_repository.py` | 内存仓储 |
-| 样例数据 | `tests/fixtures/` | 搜索结果/卖家/评价/任务配置样例 |
+| 替身 | `tests/fakes/memory_task_repository.py` | 内存任务仓储 |
+| 样例数据 | `tests/fixtures/` | 搜索/卖家/评价/配置样例 |
+
+当前约 **186** 后端用例（183 离线 + 3 live）+ **9** 前端 Vitest smoke。详见 [tests/README.md](../tests/README.md)、[web-ui/README.md](../web-ui/README.md)。
 
 ### 13.2 运行
 
 ```bash
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest          # 全部测试
-pytest --cov=src                                  # 覆盖率
-pytest tests/unit/test_utils.py::test_safe_get    # 单测
+python -m pytest -q                               # 全部离线测试（推荐）
+python -m pytest --cov=src                        # 覆盖率
+python -m pytest tests/unit/test_utils.py::test_safe_get_nested_and_default
 ./run_live_smoke.sh --keyword "MacBook Pro M2"    # 真实流量冒烟
 ```
 
+CI：`.github/workflows/pytest.yml`（后端）与 `.github/workflows/web-ui.yml`（前端）在 push/PR 时自动运行。
+
 ### 13.3 隔离设计
 
-- 测试强制使用 `data/.pytest-env`，不读仓库 `.env`
-- 移除 `DATABASE_URL`，API 测试用 `InMemoryTaskRepository`，不连真实库
-- Live 测试在临时目录运行、清空通知环境变量，避免误发消息
+- 测试使用 `data/.pytest-env`，不读仓库 `.env`
+- 任务 API 测试用 `InMemoryTaskRepository`；部分结果/卖家测试使用 PG fixture 或 mock
+- Live 测试在临时目录运行、清空通知环境变量
+- Windows 建议 `--capture=no`（已在 `pyproject.toml` 默认启用）
 
 ---
 
@@ -629,3 +695,5 @@ pytest tests/unit/test_utils.py::test_safe_get    # 单测
 | 黑名单 | ✅ | ✅ | - | - |
 | 日志 | ✅ | ✅ | ✅ | - |
 | 系统状态 | ✅ | ✅ | - | - |
+| 卖家订阅 | ✅ | ✅ | ✅ | seller_subscriptions 表 |
+| 店铺分析看板 | ✅ | ✅ | ✅ | seller_item_daily_metrics；旧 datacompass 接口保留 |

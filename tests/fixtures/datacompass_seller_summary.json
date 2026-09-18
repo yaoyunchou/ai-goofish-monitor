@@ -1,0 +1,28 @@
+{
+  "data": {
+    "extendInfo": {
+      "realDateRange": ["20260914", "20260914"]
+    },
+    "data": {
+      "graphBannerBenchData": {
+        "bannerDataList": [
+          {
+            "name": "showPv",
+            "data": 76,
+            "lastData": 72,
+            "ratio": 0.0556,
+            "ratioFormat": "5.56%",
+            "dataStr": "76"
+          },
+          {
+            "name": "browsePv",
+            "data": 41,
+            "lastData": 38,
+            "ratio": 0.0789,
+            "ratioFormat": "7.89%"
+          }
+        ]
+      }
+    }
+  }
+}

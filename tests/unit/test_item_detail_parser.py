@@ -39,6 +39,6 @@ async def test_extract_skus_from_sku_list():
 
 
 def test_parse_title_sku_fragments():
-    fragments = parse_title_sku_fragments("标题 颜色分类: 白色、长度: 2m")
+    fragments = parse_title_sku_fragments("颜色分类: 白色, 长度: 2m")
     assert len(fragments) == 2
     assert fragments[0]["name"] == "颜色分类"

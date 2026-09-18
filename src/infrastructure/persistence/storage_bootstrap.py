@@ -24,6 +24,7 @@ from src.infrastructure.persistence.storage_names import (
 
 
 BOOTSTRAP_LOCK = threading.Lock()
+_BOOTSTRAP_DONE = False
 LEGACY_CONFIG_FILE = "config.json"
 LEGACY_RESULT_DIR = "jsonl"
 LEGACY_PRICE_HISTORY_DIR = "price_history"
@@ -38,13 +39,20 @@ def bootstrap_storage(
     legacy_config_file: str | None = LEGACY_CONFIG_FILE,
     legacy_result_dir: str = LEGACY_RESULT_DIR,
     legacy_price_history_dir: str = LEGACY_PRICE_HISTORY_DIR,
+    force: bool = False,
 ) -> None:
+    global _BOOTSTRAP_DONE
+    if _BOOTSTRAP_DONE and not force:
+        return
     with BOOTSTRAP_LOCK:
+        if _BOOTSTRAP_DONE and not force:
+            return
         with db_connection(db_path) as conn:
             ensure_schema(conn)
             _import_tasks_if_needed(conn, legacy_config_file)
             _import_results_if_needed(conn, legacy_result_dir)
             _import_price_snapshots_if_needed(conn, legacy_price_history_dir)
+        _BOOTSTRAP_DONE = True
 
 
 def _table_is_empty(conn: DbConnection, table_name: str) -> bool:

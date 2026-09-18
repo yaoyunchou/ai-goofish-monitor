@@ -1,0 +1,27 @@
+{
+  "data": {
+    "extendInfo": {
+      "realDateRange": ["20260901", "20260914"]
+    },
+    "data": {
+      "buyerSceneList": [
+        {
+          "profileCode": "scene",
+          "profileVal": "搜索",
+          "usrCnt": 120,
+          "usrRatio": 0.45,
+          "usrRatioFormat": "45%"
+        }
+      ],
+      "buyerActiveList": [
+        {
+          "profileCode": "time_range",
+          "profileVal": "晚间",
+          "usrCnt": 80,
+          "usrRatio": 0.3,
+          "usrRatioFormat": "30%"
+        }
+      ]
+    }
+  }
+}

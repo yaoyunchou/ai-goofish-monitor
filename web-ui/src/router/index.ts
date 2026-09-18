@@ -42,9 +42,37 @@ const routes = [
       },
       {
         path: 'seller-subscriptions',
+        redirect: '/seller-subscriptions/sellers',
+      },
+      {
+        path: 'seller-subscriptions/collection',
+        name: 'SellerCollection',
+        component: () => import('@/views/SellerCollectionView.vue'),
+        meta: { titleKey: 'routes.sellerCollection', requiresAuth: true },
+      },
+      {
+        path: 'seller-subscriptions/sellers',
         name: 'SellerSubscriptions',
         component: () => import('@/views/SellerSubscriptionView.vue'),
         meta: { titleKey: 'routes.sellerSubscriptions', requiresAuth: true },
+      },
+      {
+        path: 'seller-subscriptions/sellers/:sellerUserId',
+        name: 'SellerDetail',
+        component: () => import('@/views/SellerDetailView.vue'),
+        meta: { titleKey: 'routes.sellerDetail', requiresAuth: true },
+      },
+      {
+        path: 'seller-subscriptions/items',
+        name: 'SellerItems',
+        component: () => import('@/views/SellerItemsView.vue'),
+        meta: { titleKey: 'routes.sellerItems', requiresAuth: true },
+      },
+      {
+        path: 'seller-subscriptions/items/:itemId',
+        name: 'SellerItemDetail',
+        component: () => import('@/views/SellerItemDetailView.vue'),
+        meta: { titleKey: 'routes.sellerItemDetail', requiresAuth: true },
       },
       {
         path: 'shop-analytics',

@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import type { ServerResponse } from 'http'
 import { defineConfig, type ProxyOptions } from 'vite'
 import vue from '@vitejs/plugin-vue'
@@ -18,7 +19,8 @@ function proxyWithBackendError(target: string): ProxyOptions {
             }),
           )
         }
-        console.error('[vite] proxy error:', err.message)
+        const message = err instanceof Error ? err.message : String(err)
+        console.error('[vite] proxy error:', message)
       })
     },
   }
@@ -45,5 +47,10 @@ export default defineConfig({
         ws: true,
       },
     },
+  },
+  test: {
+    environment: 'jsdom',
+    include: ['src/**/*.{test,spec}.ts'],
+    setupFiles: ['./vitest.setup.ts'],
   },
 })

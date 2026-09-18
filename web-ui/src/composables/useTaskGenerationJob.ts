@@ -12,7 +12,7 @@ export function useTaskGenerationJob() {
   const activeJob = ref<TaskGenerationJob | null>(null)
   const pollingError = ref<Error | null>(null)
   const isPolling = ref(false)
-  let pollTimer: ReturnType<typeof window.setTimeout> | null = null
+  let pollTimer: number | null = null
 
   function clearTimer() {
     if (pollTimer === null) return

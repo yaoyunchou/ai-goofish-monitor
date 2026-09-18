@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
+import { computed, ref, watch } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 import {
   LayoutDashboard,
   ListTodo,
@@ -11,6 +11,8 @@ import {
   ChevronRight,
   Store,
   UserRoundSearch,
+  Activity,
+  Package,
 } from 'lucide-vue-next'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useI18n } from 'vue-i18n'
@@ -20,17 +22,85 @@ const emit = defineEmits<{
 }>()
 const { isConnected } = useWebSocket()
 const { t } = useI18n()
+const route = useRoute()
 
-const navItems = computed(() => [
+interface NavChild {
+  to: string
+  label: string
+  icon: typeof LayoutDashboard
+}
+
+interface NavGroup {
+  key: string
+  label: string
+  icon: typeof LayoutDashboard
+  children: NavChild[]
+}
+
+type NavItem =
+  | { to: string; label: string; icon: typeof LayoutDashboard }
+  | NavGroup
+
+const navItems = computed<NavItem[]>(() => [
   { to: '/dashboard', label: t('sidebar.dashboard'), icon: LayoutDashboard },
   { to: '/tasks', label: t('sidebar.tasks'), icon: ListTodo },
   { to: '/accounts', label: t('sidebar.accounts'), icon: Users },
   { to: '/results', label: t('sidebar.results'), icon: Layers },
-  { to: '/seller-subscriptions', label: t('sidebar.sellerSubscriptions'), icon: UserRoundSearch },
+  {
+    key: 'seller',
+    label: t('sidebar.sellerSubscriptions'),
+    icon: UserRoundSearch,
+    children: [
+      { to: '/seller-subscriptions/collection', label: t('sidebar.sellerCollection'), icon: Activity },
+      { to: '/seller-subscriptions/sellers', label: t('sidebar.sellerSellers'), icon: Store },
+      { to: '/seller-subscriptions/items', label: t('sidebar.sellerItems'), icon: Package },
+    ],
+  },
   { to: '/shop-analytics', label: t('sidebar.shopAnalytics'), icon: Store },
   { to: '/logs', label: t('sidebar.logs'), icon: Terminal },
   { to: '/settings', label: t('sidebar.settings'), icon: Settings2 },
 ])
+
+const expandedKeys = ref<string[]>([])
+
+function isGroup(item: NavItem): item is NavGroup {
+  return 'children' in item
+}
+
+function isChildActive(child: NavChild): boolean {
+  return route.path === child.to || route.path.startsWith(child.to + '/')
+}
+
+function isGroupActive(group: NavGroup): boolean {
+  return group.children.some(isChildActive)
+}
+
+function isExpanded(group: NavGroup): boolean {
+  return expandedKeys.value.includes(group.key)
+}
+
+function toggleGroup(group: NavGroup) {
+  if (isExpanded(group)) {
+    expandedKeys.value = expandedKeys.value.filter((key) => key !== group.key)
+  } else {
+    expandedKeys.value = [...expandedKeys.value, group.key]
+  }
+}
+
+// 激活的分组自动展开（含首次进入、路由变化后）
+watch(
+  () => route.path,
+  () => {
+    const activeGroups = navItems.value
+      .filter(isGroup)
+      .filter(isGroupActive)
+      .map((group) => group.key)
+    if (activeGroups.length) {
+      expandedKeys.value = [...new Set([...expandedKeys.value, ...activeGroups])]
+    }
+  },
+  { immediate: true },
+)
 
 const connectionLabel = computed(() => (
   isConnected.value ? t('sidebar.backendConnected') : t('sidebar.backendConnecting')
@@ -44,42 +114,105 @@ const connectionTone = computed(() =>
 
 <template>
   <nav class="space-y-1">
-    <RouterLink
-      v-for="item in navItems"
-      :key="item.to"
-      :to="item.to"
-      v-slot="{ isActive }"
-      class="group relative flex items-center px-4 py-3 rounded-xl transition-all duration-200 overflow-hidden"
-      @click="emit('navigate')"
-    >
-      <!-- Active Background Effect -->
-      <div 
-        v-if="isActive" 
-        class="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent z-0"
-      ></div>
-      <div 
-        v-if="isActive" 
-        class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full"
-      ></div>
-
-      <div class="relative z-10 flex items-center w-full">
-        <component 
-          :is="item.icon" 
-          class="w-5 h-5 mr-3 transition-colors"
-          :class="isActive ? 'text-primary' : 'text-slate-400 group-hover:text-slate-600'"
-        />
-        <span 
-          class="text-sm font-bold transition-colors flex-grow"
-          :class="isActive ? 'text-slate-900' : 'text-slate-500 group-hover:text-slate-700'"
-        >
-          {{ item.label }}
-        </span>
-        <ChevronRight 
+    <template v-for="item in navItems" :key="isGroup(item) ? item.key : item.to">
+      <!-- 普通导航项 -->
+      <RouterLink
+        v-if="!isGroup(item)"
+        :to="item.to"
+        v-slot="{ isActive }"
+        class="group relative flex items-center px-4 py-3 rounded-xl transition-all duration-200 overflow-hidden"
+        @click="emit('navigate')"
+      >
+        <!-- Active Background Effect -->
+        <div
           v-if="isActive"
-          class="w-4 h-4 text-primary animate-in fade-in slide-in-from-left-2"
-        />
+          class="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent z-0"
+        ></div>
+        <div
+          v-if="isActive"
+          class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full"
+        ></div>
+
+        <div class="relative z-10 flex items-center w-full">
+          <component
+            :is="item.icon"
+            class="w-5 h-5 mr-3 transition-colors"
+            :class="isActive ? 'text-primary' : 'text-slate-400 group-hover:text-slate-600'"
+          />
+          <span
+            class="text-sm font-bold transition-colors flex-grow"
+            :class="isActive ? 'text-slate-900' : 'text-slate-500 group-hover:text-slate-700'"
+          >
+            {{ item.label }}
+          </span>
+          <ChevronRight
+            v-if="isActive"
+            class="w-4 h-4 text-primary animate-in fade-in slide-in-from-left-2"
+          />
+        </div>
+      </RouterLink>
+
+      <!-- 分组导航项 -->
+      <div v-else class="group relative overflow-hidden rounded-xl transition-all duration-200">
+        <button
+          type="button"
+          class="relative flex w-full items-center px-4 py-3 rounded-xl transition-all duration-200"
+          :class="isGroupActive(item) ? 'bg-gradient-to-r from-primary/10 to-transparent' : ''"
+          @click="toggleGroup(item)"
+        >
+          <div
+            v-if="isGroupActive(item)"
+            class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full"
+          ></div>
+          <component
+            :is="item.icon"
+            class="w-5 h-5 mr-3 transition-colors"
+            :class="isGroupActive(item) ? 'text-primary' : 'text-slate-400 group-hover:text-slate-600'"
+          />
+          <span
+            class="text-sm font-bold transition-colors flex-grow text-left"
+            :class="isGroupActive(item) ? 'text-slate-900' : 'text-slate-500 group-hover:text-slate-700'"
+          >
+            {{ item.label }}
+          </span>
+          <ChevronRight
+            class="w-4 h-4 transition-transform duration-200 text-slate-400"
+            :class="isExpanded(item) ? 'rotate-90' : ''"
+          />
+        </button>
+
+        <!-- 子菜单 -->
+        <div
+          v-show="isExpanded(item)"
+          class="space-y-0.5 pb-1"
+        >
+          <RouterLink
+            v-for="child in item.children"
+            :key="child.to"
+            :to="child.to"
+            v-slot="{ isActive }"
+            class="group relative flex items-center pl-12 pr-4 py-2.5 rounded-lg transition-all duration-200 overflow-hidden"
+            @click="emit('navigate')"
+          >
+            <div
+              v-if="isActive"
+              class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-primary rounded-r-full"
+            ></div>
+            <component
+              :is="child.icon"
+              class="w-4 h-4 mr-2.5 transition-colors"
+              :class="isActive ? 'text-primary' : 'text-slate-400 group-hover:text-slate-600'"
+            />
+            <span
+              class="text-[13px] font-semibold transition-colors"
+              :class="isActive ? 'text-slate-900' : 'text-slate-500 group-hover:text-slate-700'"
+            >
+              {{ child.label }}
+            </span>
+          </RouterLink>
+        </div>
       </div>
-    </RouterLink>
+    </template>
 
     <!-- Support Section -->
     <div class="mt-12 px-4">

@@ -186,6 +186,7 @@ watch(
     if (taskType === 'shop_datacompass') {
       accountStrategy.value = 'fixed'
       if (!form.value.cron) form.value.cron = '0 8 * * *'
+    }
   },
 )
 

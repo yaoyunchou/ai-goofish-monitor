@@ -13,7 +13,7 @@ export interface GetResultContentParams {
 }
 
 export async function getResultFiles(): Promise<string[]> {
-  const data = await http('/api/results/files')
+  const data = await http<{ files: string[] }>('/api/results/files')
   return data.files || []
 }
 
