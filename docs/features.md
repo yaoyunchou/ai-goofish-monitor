@@ -3,6 +3,8 @@
 > 本文档系统性地罗列 `ai-goofish-monitor` 的**全部功能点**：Web UI 功能、后端 API 端点、任务配置字段、AI 能力、通知渠道、账号/代理轮换、价格洞察、黑名单、命令行、Chrome 扩展、测试体系。
 >
 > 适用于：功能验收、测试设计、二次开发、使用者查阅。
+>
+> **2026-09-20 归档**：本期需求/设计快照见 [`docs/prd/milestone-2026-09-20.md`](./prd/milestone-2026-09-20.md) 与 [`docs/design/milestone-2026-09-20.md`](./design/milestone-2026-09-20.md)。本文仍是已实现功能清单。
 
 ---
 

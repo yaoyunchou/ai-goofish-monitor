@@ -1,8 +1,8 @@
 # PRD：店铺数据页改为卖家订阅分析看板
 
-> **文档性质**：简单 PRD（software-company / PM 许清楚）  
+> **交付状态**：**已交付**（2026-09-17 / 2026-09-20）  
 > **日期**：2026-09-17  
-> **关联**：采集口径以 [`docs/design/seller-subscription-collection-strategy.md`](../design/seller-subscription-collection-strategy.md) §5.4 为准；不另写第二套「监控商品」定义。
+> **关联**：采集口径以 [`docs/design/seller-subscription-collection-strategy.md`](../design/seller-subscription-collection-strategy.md) §5.4 为准；归档见 [`milestone-2026-09-20.md`](./milestone-2026-09-20.md)。
 
 ---
 
@@ -204,4 +204,4 @@
 
 ---
 
-**交付状态**：待架构 / 研发。本 PRD 不含实现代码。
+**交付状态**：已交付（2026-09-17/20）。需求已闭环，datacompass 揉进主看板仍为 P2 backlog。

@@ -1,7 +1,8 @@
 # 技术方案：卖家订阅采集与风控
 
 > **对应 PRD**：[卖家订阅大规模采集 · 风控与运营](../prd/seller-subscription-anti-risk.md)  
-> **更新日期**：2026-09-17
+> **更新日期**：2026-09-17  
+> **归档**：2026-09-20 见 [milestone-2026-09-20.md](./milestone-2026-09-20.md)；采集顺序以 [collection-strategy](./seller-subscription-collection-strategy.md) 为准，本文不重复
 
 ---
 

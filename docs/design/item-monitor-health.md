@@ -1,7 +1,8 @@
 # 商品监控健康度与自动停用
 
-> 状态：**已交付（默认安全空跑）** · 关联 PRD：[`docs/prd/item-monitor-health.md`](../prd/item-monitor-health.md)
-> 关联功能文档：[`docs/features.md` §2.12 / §3.12 / §12.6](../features.md)
+> 状态：**已交付（默认安全空跑）** · 关联 PRD：[`docs/prd/item-monitor-health.md`](../prd/item-monitor-health.md)  
+> 关联功能文档：[`docs/features.md` §2.12 / §3.12 / §12.6](../features.md)  
+> **归档**：2026-09-20 见 [milestone-2026-09-20.md](./milestone-2026-09-20.md)
 
 ## 1. 背景与目标
 

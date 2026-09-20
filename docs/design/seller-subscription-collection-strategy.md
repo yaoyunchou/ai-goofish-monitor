@@ -5,7 +5,8 @@
 > **对应测试**：`tests/unit/test_seller_subscription_priority_strategy.py`  
 > **姊妹文档**：[卖家订阅采集与风控](./seller-subscription-scrape.md)（节奏参数、账号、表结构、API；**不**重复写优先级）  
 > **对应 PRD**：[卖家订阅大规模采集 · 风控与运营](../prd/seller-subscription-anti-risk.md)（产品目标；**现行采集顺序以本文为准**）  
-> **核对日期**：2026-09-17（与当时代码一致，非规划草案）
+> **核对日期**：2026-09-17（与当时代码一致，非规划草案）  
+> **归档**：2026-09-20 冻结见 [milestone-2026-09-20.md](./milestone-2026-09-20.md)
 
 ---
 

@@ -1,6 +1,7 @@
 # 店铺商品采集预算与「保量 + 补位」选品算法
 
-> 状态：**设计定稿 v4（2026-09-18 全部澄清完成，可开工）** · 关联：[`item-monitor-health.md`](./item-monitor-health.md)
+> 状态：**设计定稿 v4（2026-09-18 全部澄清完成，可开工）** · 关联：[`item-monitor-health.md`](./item-monitor-health.md)  
+> **主采集未接**：仅 `scripts/item_selection_simulate.py`；归档见 [milestone-2026-09-20.md](./milestone-2026-09-20.md)  
 > 本文是「每店最多采 100 个，不达标的踢掉、用没采过的补上」这一需求的 **算法 SSOT**
 
 ## 0. 最终确认的规则

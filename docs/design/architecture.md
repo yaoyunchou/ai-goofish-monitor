@@ -3,6 +3,9 @@
 > 本文档详细描述 `ai-goofish-monitor` 的系统架构：总体设计、分层职责、核心执行链路、数据模型、并发与进程模型、配置体系、前端架构、部署架构与关键设计决策。
 >
 > 适用于：开发者、架构评审、二次开发。
+>
+> **2026-09-20 里程碑**：[milestone-2026-09-20.md](./milestone-2026-09-20.md)（已落地索引、调度/删除铁律、下次改哪里）。  
+> **采集优先级唯一 SSOT**：[seller-subscription-collection-strategy.md](./seller-subscription-collection-strategy.md)。本文是全量架构，不按迭代整篇改写；专题索引见 [README](./README.md)。
 
 ---
 

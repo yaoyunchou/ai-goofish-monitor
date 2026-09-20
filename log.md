@@ -2,6 +2,15 @@
 
 ## 2026-09-20
 
+### docs: 归档 9/16–9/20 需求与技术方案
+
+- 新增 `docs/prd/milestone-2026-09-20.md`：已交付（三阶段采集、订阅看板、控制台 Cron、删除级联、健康度空跑）与 backlog（IP 轮换、datacompass、选品预算接入、Cron 补跑）
+- 新增 `docs/design/milestone-2026-09-20.md`：SSOT 地图、落地文件索引、调度/删除铁律、下次改代码入口
+- 刷新 `docs/prd/README.md`、`docs/design/README.md` 及兼容入口；补登记 `item-monitor-health`、`item-selection-budget`
+- 各专题 PRD 文首改为交付状态；`architecture.md` 只加里程碑指针，不整篇重写
+- 下次新需求：先写 `docs/prd/<英文短名>.md` 并登记索引，再改代码
+- 交付报告：`deliverables/software-company/docs-archive-delivery-2026-09-20.md`
+
 ### fix(seller-subscription): 删除订阅后商品列表不再继续展示该店数据
 
 - 原因：订阅行已删，但日指标/商品主表仍残留（进程未加载级联删除，或历史只删了 `seller_subscriptions`）

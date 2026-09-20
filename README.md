@@ -10,7 +10,8 @@
 
 **项目与架构（开发者向）：**
 - [项目说明文档](./docs/project-overview.md) — 项目全貌、技术栈、目录结构、数据流、发展历程
-- [技术方案](./docs/design/README.md) — 架构、数据库、采集链路（[`architecture.md`](./docs/design/architecture.md)）
+- [产品需求](./docs/prd/README.md) — PRD 索引；[2026-09-20 需求快照](./docs/prd/milestone-2026-09-20.md)
+- [技术方案](./docs/design/README.md) — 架构、数据库、采集链路（[`architecture.md`](./docs/design/architecture.md)）；[2026-09-20 技术快照](./docs/design/milestone-2026-09-20.md)
 - [功能文档](./docs/features.md) — 功能点、API 端点清单、任务配置、通知渠道、配置项、测试体系
 
 **使用与配置（使用者向）：**

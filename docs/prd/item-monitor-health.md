@@ -1,7 +1,8 @@
 # 商品监控健康度与自动停用 · PRD
 
-> 状态：**已交付（默认安全空跑）** · 对应设计：[`docs/design/item-monitor-health.md`](../design/item-monitor-health.md)
-> 提出日期：2026-09-18
+> **交付状态**：**已交付（默认安全空跑）** · `MONITOR_AUTO_DISABLE_ENABLED=false`、`MONITOR_DRY_RUN=true`
+> **提出日期**：2026-09-18 · 对应设计：[`docs/design/item-monitor-health.md`](../design/item-monitor-health.md)
+> **归档**：[`milestone-2026-09-20.md`](./milestone-2026-09-20.md)；默认改为真正自动停用须用户改 env，不在本期默认行为
 
 ## 1. 问题
 

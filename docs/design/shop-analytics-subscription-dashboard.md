@@ -3,7 +3,8 @@
 > **文档性质**：架构设计（software-company / 架构师 高见远）  
 > **日期**：2026-09-17  
 > **对应 PRD**：[店铺数据页改为卖家订阅分析看板](../prd/shop-analytics-subscription-dashboard.md)  
-> **口径 SSOT**：[`seller-subscription-collection-strategy.md`](./seller-subscription-collection-strategy.md) §5.4（监控商品 ≠ 店铺商品总数）
+> **口径 SSOT**：[`seller-subscription-collection-strategy.md`](./seller-subscription-collection-strategy.md) §5.4（监控商品 ≠ 店铺商品总数）  
+> **归档**：已交付；2026-09-20 见 [milestone-2026-09-20.md](./milestone-2026-09-20.md)
 
 ---
 

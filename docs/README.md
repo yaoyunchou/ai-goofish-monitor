@@ -9,15 +9,20 @@
 | 文档 | 说明 |
 |------|------|
 | [PRD 目录](./prd/README.md) | 全部产品需求文档索引 |
-| [卖家订阅 · 风控与运营](./prd/seller-subscription-anti-risk.md) | 大规模采集降速、多账号分工、无头调度（2026-09-17） |
-| [项目健康度分析](./prd/project-health.md) | 文档/测试缺口审计与 5 阶段整改计划 |
+| [里程碑需求快照 · 2026-09-20](./prd/milestone-2026-09-20.md) | 本期已交付 / 未做 / 下次开工约定（归档） |
+| [卖家订阅 · 风控与运营](./prd/seller-subscription-anti-risk.md) | 大规模采集降速、多账号分工、无头调度 |
+| [店铺数据 · 卖家订阅看板](./prd/shop-analytics-subscription-dashboard.md) | `/shop-analytics` 订阅日指标分析页 |
+| [商品监控健康度](./prd/item-monitor-health.md) | 周健康度判定；默认安全空跑 |
+| [项目健康度分析](./prd/project-health.md) | 2026-09-16 历史基线；以 features/CI 为准 |
 
 ### 🏗️ 技术方案（Design）
 
 | 文档 | 说明 |
 |------|------|
 | [设计文档目录](./design/README.md) | 架构、数据库、采集链路等技术方案索引 |
+| [技术里程碑 · 2026-09-20](./design/milestone-2026-09-20.md) | 已落地模块、调度/删除铁律、下次改代码入口 |
 | [系统架构](./design/architecture.md) | 分层架构、进程模型、数据模型、设计决策 |
+| [采集优先级策略（SSOT）](./design/seller-subscription-collection-strategy.md) | 采谁、先采什么、分几段 |
 | [卖家订阅采集方案](./design/seller-subscription-scrape.md) | 风控节奏、无头调度、实现索引（对应上列 PRD） |
 | [PostgreSQL 接入](./design/database-supabase-integration.md) | 数据库连接、建表与迁移 |
 
@@ -53,6 +58,7 @@
 ## 阅读建议
 
 - **第一次使用项目** → 先看 [用户使用指南](./user-guide.md)，再补 [项目说明文档](./project-overview.md)
+- **了解本期做到哪、下次从哪开** → [需求里程碑](./prd/milestone-2026-09-20.md) / [技术里程碑](./design/milestone-2026-09-20.md)
 - **了解系统怎么设计** → [技术方案目录](./design/README.md) / [架构文档](./design/architecture.md)
 - **查某个功能/接口/配置怎么用** → [功能文档](./features.md)
 - **爬虫提示登录失效** → [闲鱼 Cookie 获取指南](./getting-xianyu-cookies.md)
