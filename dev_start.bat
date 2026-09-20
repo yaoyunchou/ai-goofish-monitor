@@ -67,6 +67,60 @@ if not exist "web-ui\node_modules" (
     echo.
 )
 
+REM ============================================================
+REM  Port conflict check
+REM  Common trap: another program already owns this port, so the
+REM  backend window dies with "address already in use" and the
+REM  browser keeps talking to the WRONG app.
+REM ============================================================
+set "PORT_BUSY="
+for /f "tokens=5" %%p in ('netstat -ano ^| findstr /i "LISTENING" ^| findstr /c:":!BACKEND_PORT! "') do set "PORT_BUSY=%%p"
+
+if defined PORT_BUSY (
+    set "PORT_PROC=unknown"
+    for /f "tokens=1 delims=," %%n in ('tasklist /FI "PID eq !PORT_BUSY!" /NH /FO CSV 2^>nul ^| findstr /i /c:".exe"') do set "PORT_PROC=%%~n"
+
+    echo.
+    echo ========================================
+    echo   [WARN] Port !BACKEND_PORT! is already in use
+    echo ========================================
+    echo   PID     : !PORT_BUSY!
+    echo   Process : !PORT_PROC!
+    echo.
+    echo   Something is already listening on port !BACKEND_PORT!.
+    echo   If you start the backend now it may fail to bind, and
+    echo   http://localhost:!BACKEND_PORT! will keep serving THAT
+    echo   program instead of this project.
+    echo.
+    echo   How to fix:
+    echo     1^) Stop the other program, or
+    echo     2^) Change SERVER_PORT in .env to a free port ^(e.g. 8010^)
+    echo.
+    echo   Inspect the owner with:
+    echo       netstat -ano ^| findstr ":!BACKEND_PORT! "
+    echo.
+    set /p "CONT=Start anyway? [y/N] "
+    if /i not "!CONT!"=="y" (
+        echo.
+        echo Aborted. No services were started.
+        echo.
+        endlocal
+        exit /b 1
+    )
+    echo.
+    echo Continuing anyway ...
+)
+
+REM ---------- Frontend port: vite auto-increments when busy ----------
+set "FE_BUSY="
+for /f "tokens=5" %%p in ('netstat -ano ^| findstr /i "LISTENING" ^| findstr /c:":5173 "') do set "FE_BUSY=%%p"
+if defined FE_BUSY (
+    echo.
+    echo [WARN] Port 5173 is already in use ^(PID !FE_BUSY!^).
+    echo        Vite will pick the next free port automatically -
+    echo        check the frontend window for the real URL.
+)
+
 echo.
 echo ========================================
 echo   Goofish Monitor - dev launcher
