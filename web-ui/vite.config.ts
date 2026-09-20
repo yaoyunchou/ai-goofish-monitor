@@ -26,8 +26,8 @@ function proxyWithBackendError(target: string): ProxyOptions {
   }
 }
 
-// 后端地址：默认 8000，可用 BACKEND_PORT 覆盖（本项目本地开发用 8001，避开端口占用）。
-const backendPort = process.env.BACKEND_PORT || '8000'
+// 后端地址：默认 8010，可用 BACKEND_PORT 覆盖（本机 8000 被其他项目占用）。
+const backendPort = process.env.BACKEND_PORT || '8010'
 const backendHttp = `http://127.0.0.1:${backendPort}`
 const backendWs = `ws://127.0.0.1:${backendPort}`
 

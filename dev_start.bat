@@ -6,7 +6,7 @@ REM  Local dev launcher: backend + frontend
 REM  Usage: run dev_start.bat (or double-click it)
 REM
 REM  Ports:
-REM    - backend port comes from SERVER_PORT in .env (default 8000)
+REM    - backend port comes from SERVER_PORT in .env (default 8010)
 REM    - frontend runs on 5173; BACKEND_PORT tells vite where to proxy
 REM
 REM  Note: this script only starts services. It does NOT install
@@ -42,7 +42,7 @@ if exist "%VENV_PY%" (
 if not exist logs mkdir logs >nul 2>&1
 
 REM ---------- Read SERVER_PORT from .env ----------
-set "BACKEND_PORT=8000"
+set "BACKEND_PORT=8010"
 if exist ".env" (
     for /f "usebackq tokens=1,* delims==" %%a in (".env") do (
         if /i "%%a"=="SERVER_PORT" (

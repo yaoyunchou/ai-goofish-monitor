@@ -12,7 +12,7 @@ REM    start.bat check      Environment check only
 REM    start.bat help       Show this help
 REM
 REM  Notes:
-REM    - Production serves everything from http://localhost:8000
+REM    - Production serves everything from http://localhost:8010
 REM    - Dev mode runs the frontend on 5173 and proxies API calls to the backend
 REM    - Port is read from SERVER_PORT in .env
 REM ============================================================
@@ -112,7 +112,7 @@ if exist ".env" (
 )
 
 REM --- backend port from .env ---
-set "SERVER_PORT=8000"
+set "SERVER_PORT=8010"
 if exist ".env" (
     for /f "usebackq tokens=1,* delims==" %%a in (".env") do (
         if /i "%%a"=="SERVER_PORT" (
