@@ -73,7 +73,42 @@ class SchedulerService:
                 except ValueError as e:
                     print(f"  -> [警告] 任务 '{task.task_name}' 的 Cron 表达式无效: {e}")
 
+        # 加载关注卖家定时任务
+        self._load_seller_jobs()
+
         print("定时任务加载完成")
+
+    def _load_seller_jobs(self):
+        """加载关注卖家的定时刷新任务"""
+        try:
+            from src.services.seller_service import list_followed_sellers
+            sellers = list_followed_sellers()
+            for s in sellers:
+                sid = s.get("seller_id")
+                cron = s.get("cron") or "0 */6 * * *"
+                if not sid:
+                    continue
+                try:
+                    trigger = build_cron_trigger(cron, timezone=self.scheduler.timezone)
+                    self.scheduler.add_job(
+                        self._run_seller_refresh,
+                        trigger=trigger,
+                        args=[sid],
+                        id=f"seller_{sid}",
+                        name=f"SellerRefresh: {sid}",
+                        replace_existing=True,
+                    )
+                    print(f"  -> 已为关注卖家 '{sid}' 添加定时规则: '{cron}'")
+                except ValueError as e:
+                    print(f"  -> [警告] 关注卖家 '{sid}' 的 Cron 表达式无效: {e}")
+        except Exception as e:
+            print(f"  -> [警告] 加载关注卖家任务失败: {e}")
+
+    async def _run_seller_refresh(self, seller_id: str):
+        """执行关注卖家刷新任务"""
+        from src.services.seller_service import refresh_seller_items
+        print(f"关注卖家定时刷新触发: seller_id={seller_id}")
+        await refresh_seller_items(seller_id)
 
     async def _run_task(self, task_id: int, task_name: str):
         """执行定时任务"""

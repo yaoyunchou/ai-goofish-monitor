@@ -47,23 +47,48 @@ case "$(uname -s 2>/dev/null || echo unknown)" in
         ;;
     MINGW*|MSYS*|CYGWIN*)
         OS_FAMILY="windows"
+        # Windows 上没有 python3，优先用 python，其次 py
+        if command -v python >/dev/null 2>&1; then
+            PYTHON_CMD="python"
+        elif command -v py >/dev/null 2>&1; then
+            PYTHON_CMD="py"
+        fi
+        PIP_CMD="$PYTHON_CMD -m pip"
         ;;
     *)
         OS_FAMILY="unknown"
         ;;
 esac
 
+# 0.1 创建并启用 .venv 虚拟环境
+VENV_DIR="$SCRIPT_DIR/.venv"
+if [ "$OS_FAMILY" = "windows" ]; then
+    VENV_PYTHON="$VENV_DIR/Scripts/python.exe"
+else
+    VENV_PYTHON="$VENV_DIR/bin/python"
+fi
+
+if [ ! -f "$VENV_PYTHON" ]; then
+    echo -e "${YELLOW}首次运行，正在创建 .venv 虚拟环境...${NC}"
+    $PYTHON_CMD -m venv "$VENV_DIR"
+    echo -e "${GREEN}✓ .venv 已创建${NC}"
+fi
+
+# 切换到虚拟环境的 python / pip
+PYTHON_CMD="$VENV_PYTHON"
+PIP_CMD="$VENV_PYTHON -m pip"
+
 MISSING_ITEMS=()
 
-if ! command -v python3 >/dev/null 2>&1; then
-    MISSING_ITEMS+=("python3(>=3.10)")
+if ! command -v $PYTHON_CMD >/dev/null 2>&1; then
+    MISSING_ITEMS+=("python(>=3.10)")
 else
-    if ! python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)' >/dev/null 2>&1; then
-        MISSING_ITEMS+=("python3(>=3.10)")
+    if ! $PYTHON_CMD -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)' >/dev/null 2>&1; then
+        MISSING_ITEMS+=("python(>=3.10)")
     fi
 fi
 
-if ! python3 -m pip --version >/dev/null 2>&1; then
+if ! $PIP_CMD --version >/dev/null 2>&1; then
     MISSING_ITEMS+=("pip")
 fi
 
@@ -75,7 +100,7 @@ if ! command -v npm >/dev/null 2>&1; then
     MISSING_ITEMS+=("npm")
 fi
 
-if ! python3 -m playwright --version >/dev/null 2>&1; then
+if ! $PYTHON_CMD -m playwright --version >/dev/null 2>&1; then
     MISSING_ITEMS+=("playwright")
 fi
 
@@ -303,7 +328,7 @@ if [ ! -f "requirements.txt" ]; then
 fi
 
 echo "正在安装 Python 依赖..."
-python3 -m pip install -r requirements.txt --quiet
+$PIP_CMD install -r requirements.txt --quiet
 echo -e "${GREEN}✓ Python 依赖安装完成${NC}"
 
 # 3. 构建前端
@@ -341,8 +366,8 @@ echo -e "${GREEN}✓ 已确认构建产物位于项目根目录 dist/${NC}"
 echo -e "\n${YELLOW}[6/6] 启动后端服务...${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}服务启动中...${NC}"
-echo -e "${GREEN}访问地址: http://localhost:8000${NC}"
-echo -e "${GREEN}API 文档: http://localhost:8000/docs${NC}"
+echo -e "${GREEN}访问地址: http://localhost:7000${NC}"
+echo -e "${GREEN}API 文档: http://localhost:7000/docs${NC}"
 echo -e "${GREEN}========================================${NC}\n"
 
-python3 -m src.app
+$PYTHON_CMD -m src.app

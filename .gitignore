@@ -15,4 +15,5 @@ prompts/
 .serena/
 price_history/
 data/
+.venv/
 .env.202608*

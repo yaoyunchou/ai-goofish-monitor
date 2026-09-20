@@ -72,7 +72,15 @@ def _normalize_sku_entry(raw: dict, *, fallback_title: str = "") -> Optional[Dic
         or raw.get("promotionPrice")
         or raw.get("actPrice")
     )
-    price_number, price_display = _format_price(price_raw)
+    price_in_cent = raw.get("priceInCent")
+    if price_in_cent is not None:
+        try:
+            price_number = round(float(price_in_cent) / 100, 2)
+            price_display = f"¥{price_number:g}"
+        except (TypeError, ValueError):
+            price_number, price_display = _format_price(price_raw)
+    else:
+        price_number, price_display = _format_price(price_raw)
     properties = (
         raw.get("propertyList")
         or raw.get("properties")
@@ -84,13 +92,21 @@ def _normalize_sku_entry(raw: dict, *, fallback_title: str = "") -> Optional[Dic
     label = raw.get("skuText") or raw.get("title") or _build_sku_label(properties, fallback_title)
     if price_number is None and not price_display and not label:
         return None
+    quantity = raw.get("quantity")
+    in_stock = raw.get("canBuy", raw.get("inStock", True))
+    if quantity is not None:
+        try:
+            in_stock = int(quantity) > 0
+        except (TypeError, ValueError):
+            pass
     return {
         "sku_id": str(sku_id) if sku_id is not None else "",
         "label": str(label).strip() or fallback_title or "默认规格",
         "price": price_number,
         "price_display": price_display or (f"¥{price_number:g}" if price_number is not None else ""),
         "properties": properties,
-        "in_stock": raw.get("canBuy", raw.get("inStock", True)),
+        "quantity": quantity,
+        "in_stock": in_stock,
     }
 
 
@@ -156,8 +172,12 @@ async def extract_skus_from_detail_payloads(
         current_item_do = data.get("itemDO") or data.get("itemDo") or {}
         if isinstance(current_item_do, dict) and current_item_do:
             item_do = {**item_do, **current_item_do}
-        _collect_sku_lists(data, raw_entries)
-        _collect_sku_lists(payload, raw_entries)
+            _collect_sku_lists(current_item_do, raw_entries)
+        elif data.get("itemId") or data.get("skuList") or data.get("idleItemSkuList"):
+            item_do = {**item_do, **data}
+            _collect_sku_lists(data, raw_entries)
+        else:
+            _collect_sku_lists(data, raw_entries)
 
     normalized: List[Dict[str, Any]] = []
     seen: set[str] = set()

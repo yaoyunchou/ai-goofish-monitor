@@ -2,10 +2,71 @@
 新架构的主应用入口
 整合所有路由和服务
 """
+import logging
+import sys
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+
+
+class _RobustStreamHandler(logging.StreamHandler):
+    """Windows + uvicorn --reload 下 multiprocessing spawn 会导致子进程
+    继承的 stdout/stderr 缓冲被 detach，emit 时抛 ValueError。
+    此 handler 每次刷新 stream 引用并吞掉该错误，保证日志不中断。"""
+
+    def _is_stream_broken(self, stream) -> bool:
+        if stream is None:
+            return True
+        try:
+            # 访问 closed / writable 都可能触发 ValueError（缓冲已 detach）
+            return bool(stream.closed)
+        except (ValueError, OSError):
+            return True
+
+    def _resolve_stream(self):
+        """返回一个可用的输出流，优先沿用原方向（stdout/stderr）。"""
+        is_err = self.stream is sys.stderr
+        candidate = sys.stderr if is_err else sys.stdout
+        if self._is_stream_broken(candidate):
+            # 当前目标流也坏掉时，退回另一边，再不行返回 None（丢弃日志）
+            fallback = sys.stdout if is_err else sys.stderr
+            return None if self._is_stream_broken(fallback) else fallback
+        return candidate
+
+    def emit(self, record):  # noqa: D401
+        if self._is_stream_broken(self.stream):
+            self.stream = self._resolve_stream()
+            if self.stream is None:
+                return
+        try:
+            super().emit(record)
+        except (ValueError, OSError):
+            try:
+                self.flush()
+            except Exception:
+                pass
+            self.stream = self._resolve_stream()
+
+
+def _install_robust_logging() -> None:
+    """替换 root 与 uvicorn 日志器的 StreamHandler，规避 detached buffer。"""
+    handler = _RobustStreamHandler(sys.stdout)
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    )
+    root = logging.getLogger()
+    for h in list(root.handlers):
+        if isinstance(h, logging.StreamHandler) and not isinstance(h, _RobustStreamHandler):
+            root.handlers.remove(h)
+    root.addHandler(handler)
+    for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
+        lg = logging.getLogger(name)
+        lg.handlers = [handler]
+        lg.propagate = False
+
+
+_install_robust_logging()
 
 from src.api.routes import (
     dashboard,
@@ -18,6 +79,7 @@ from src.api.routes import (
     websocket,
     accounts,
     collections,
+    sellers,
 )
 from src.api.dependencies import (
     set_process_service,
@@ -114,6 +176,7 @@ app.include_router(collections.router)
 app.include_router(login_state.router)
 app.include_router(websocket.router)
 app.include_router(accounts.router)
+app.include_router(sellers.router)
 
 # 挂载静态文件
 # 旧的静态文件目录（用于截图等）

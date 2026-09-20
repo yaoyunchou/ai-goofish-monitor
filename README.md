@@ -56,7 +56,7 @@ docker compose up -d
 - 官方镜像地址：`ghcr.io/usagi-org/ai-goofish:latest`
 - 更新镜像：`docker compose pull && docker compose up -d`
 - 如果你修改了 `.env` 中的 `SERVER_PORT`，请同步更新 `docker-compose.yaml` 里的端口映射。
-- **数据库**：在 `.env` 配置 `DATABASE_URL`（PostgreSQL / Supabase），Docker 不再挂载 SQLite 文件。
+- **数据库**：在 `.env` 配置 `DATABASE_URL`（PostgreSQL / Supabase）。**本地开发**可只起 `docker compose -f docker-compose.dev.yml` 提供 Postgres，应用仍在宿主机运行（见「开发者开发 → 日常本地调试」）。
 - 默认持久化这些目录：
     - `state/`  登录状态 cookie 文件
     - `prompts/`  任务提示词
@@ -136,11 +136,40 @@ docker compose up -d
 
 ## 开发者开发
 
+### 日常本地调试（推荐）
+
+**只有 PostgreSQL 用 Docker**，前后端都在本机跑，改代码立刻生效（后端 `--reload`、前端 Vite HMR）。  
+**不要**为了改代码去跑 `docker compose up`（那是给服务器「整包部署」用的）。
+
+```bash
+# 1. 仅启动数据库（密码、库名见 docker-compose.dev.yml）
+docker compose -f docker-compose.dev.yml up -d
+
+# 2. .env 里数据库指向本机（与 dev 库一致）
+# DATABASE_URL=postgresql+asyncpg://postgres:goofish@127.0.0.1:5432/goofish
+
+# 3. 后端（热重载）— 或直接使用 ./start_dev.sh 同时起前后端
+uvicorn src.app:app --host 0.0.0.0 --port 8000 --reload
+
+# 4. 前端（另开终端）— start_dev.sh 会自动并行启动
+cd web-ui && npm install && npm run dev
+```
+
+- 浏览器打开 Vite 提示的地址（一般是 `http://127.0.0.1:5173`），侧栏「收录商品」等**本地未发布功能**都在这里。
+- `web-ui/vite.config.ts` 会从根目录 `.env` 读取 `SERVER_PORT` 作为 API 代理目标；与后端监听端口保持一致即可（可用 `./start_dev.sh` 一键对齐）。
+- 停掉误起的**应用容器**（保留数据库）：`docker compose down`（不要对 `docker-compose.dev.yml` 执行 down，除非你要关库）。
+
+| 场景 | 用什么 |
+|------|--------|
+| 本机写代码、调试 | 上表：dev Postgres + 本地 uvicorn + `npm run dev` |
+| 服务器一键上线 | `docker compose up -d`（官方镜像） |
+| 服务器要跑**你当前仓库**未发版功能 | `docker compose -f docker-compose.yaml -f docker-compose.local.yaml up -d --build` |
+
 ### 环境要求
 
 - Python 3.10+
 - Node.js + npm（本地验证 `Node v20.18.3` 可完成前端构建）
-- Playwright CLI 与 Chromium，首次运行前建议执行 `python3 -m pip install playwright && python3 -m playwright install chromium`
+- Playwright CLI 与 Chromium，首次运行前建议执行 `python -m pip install playwright && python -m playwright install chromium`
 - Chrome / Edge 浏览器（Linux 环境也可使用 Chromium；`start.sh` 会先检查浏览器是否存在）
 
 ```bash
@@ -149,27 +178,70 @@ cd ai-goofish-monitor
 cp .env.example .env
 ```
 
-### 一键启动
+### 一键启动（推荐）
+
+**生产式本地运行**（全量 build，无热更新）：
 
 ```bash
 chmod +x start.sh
 ./start.sh
 ```
 
-`start.sh` 会先检查 Playwright CLI 和浏览器前置条件；在前置条件满足后自动安装项目依赖、构建前端、复制构建产物并启动后端。
+**开发模式**（后端 `--reload` + 前端 Vite HMR，推荐改代码时用）：
+
+```bash
+chmod +x start_dev.sh
+./start_dev.sh
+```
+
+先确保数据库已启动：`docker compose -f docker-compose.dev.yml up -d`。  
+开发时浏览器请打开 **Vite 地址**（一般为 `http://127.0.0.1:5173`），API 会按根目录 `.env` 的 `SERVER_PORT` 代理到本机后端。
+
+`start.sh` 会自动完成以下步骤：
+
+1. 检查环境与依赖（Python / Node / 浏览器）
+2. **首次运行自动创建 `.venv` 虚拟环境**，后续所有 Python 操作均使用 `.venv`，不污染系统 Python
+3. 安装 `requirements.txt` 到 `.venv`
+4. 构建前端（`web-ui` → 根目录 `dist/`）
+5. 启动后端服务
+
+> Windows 用户在 Git Bash (MINGW64) 中运行即可；脚本会自动识别 `python` / `py` 命令。
+> `.venv` 已加入 `.gitignore`，不会提交到仓库。
 
 ### 手动启动
 
+#### 方式一：激活 .venv 后运行
+
 ```bash
-# 后端
+# Git Bash / Linux / macOS
+source .venv/bin/activate
+
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
+
+# 激活后直接用 python
 python -m src.app
 # 或
 uvicorn src.app:app --host 0.0.0.0 --port 8000 --reload
+```
 
-# 前端
+#### 方式二：不激活，直接用 .venv 的 python
+
+```bash
+# Git Bash / Linux / macOS
+.venv/bin/python -m src.app
+
+# Windows
+.venv\Scripts\python.exe -m src.app
+```
+
+#### 前端开发
+
+```bash
 cd web-ui
 npm install
-npm run dev
+npm run dev      # 开发模式，热更新，代理 /api 到后端
+npm run build     # 生产构建，输出到根目录 dist/
 ```
 
 - FastAPI 启动时连接 PostgreSQL；表为空时会尝试从 `config.json` / `jsonl/` / `price_history` 导入
@@ -182,7 +254,11 @@ npm run dev
 ### 测试与校验
 
 ```bash
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest
+# 使用 .venv 运行测试
+.venv/bin/pytest
+# 或 Windows
+.venv\Scripts\python.exe -m pytest
+
 cd web-ui && npm run build
 ```
 

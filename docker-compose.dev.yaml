@@ -1,13 +1,24 @@
+# 已弃用：整目录挂载 + /app/dist 匿名卷会盖住新构建的前端。
+# 请使用：docker compose -f docker-compose.yaml -f docker-compose.local.yaml up -d --build
 services:
   app:
     build: .
+    image: ai-goofish-monitor:local
     container_name: ai-goofish-monitor-app
     init: true
+    pull_policy: never
     ports:
-      - "8000:8000"
+      - "${SERVER_PORT:-8000}:${SERVER_PORT:-8000}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file:
       - .env
     volumes:
-      - .:/app
-      - /app/dist
+      - ./state:/app/state
+      - ./config.json:/app/config.json
+      - ./prompts:/app/prompts
+      - ./jsonl:/app/jsonl
+      - ./logs:/app/logs
+      - ./images:/app/images
+      - ./price_history:/app/price_history
     restart: unless-stopped

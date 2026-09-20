@@ -82,3 +82,9 @@ python3 -m scripts.migrate_sqlite_to_postgres --source data/app.sqlite3
 | `anon` / `service_role` | 不必用于监控业务表 |
 
 业务表已启用 RLS 且无开放策略；后端用 Database 连接串不受 PostgREST 限制。
+
+---
+
+## 7. 本地与线上双向同步
+
+若本机 Docker Postgres 与 Supabase 需要**双向**对齐数据，见：[database-bidirectional-sync.md](./database-bidirectional-sync.md)（含表级策略、冲突处理与分阶段实现计划）。当前仓库已实现 **线上 → 本地** 全量拉取：`python -m scripts.sync_postgres_remote_to_local`。

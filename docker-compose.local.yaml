@@ -1,0 +1,8 @@
+# 使用本仓库源码构建镜像（含侧栏「收录商品」等未发布到 ghcr 的功能）
+# 用法：docker compose -f docker-compose.yaml -f docker-compose.local.yaml up -d --build
+
+services:
+  app:
+    build: .
+    image: ai-goofish-monitor:local
+    pull_policy: never

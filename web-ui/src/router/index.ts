@@ -41,6 +41,24 @@ const routes = [
         meta: { titleKey: 'routes.results', requiresAuth: true },
       },
       {
+        path: 'collections',
+        name: 'Collections',
+        component: () => import('@/views/CollectionsView.vue'),
+        meta: { titleKey: 'routes.collections', requiresAuth: true },
+      },
+      {
+        path: 'sellers',
+        name: 'FollowedSellers',
+        component: () => import('@/views/FollowedSellersView.vue'),
+        meta: { titleKey: 'routes.sellers', requiresAuth: true },
+      },
+      {
+        path: 'sellers/:sellerId',
+        name: 'SellerDetail',
+        component: () => import('@/views/SellerDetailView.vue'),
+        meta: { titleKey: 'routes.sellerDetail', requiresAuth: true },
+      },
+      {
         path: 'results/collected/:id',
         name: 'CollectionDetail',
         component: () => import('@/views/CollectionDetailView.vue'),

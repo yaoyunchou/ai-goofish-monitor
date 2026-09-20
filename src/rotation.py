@@ -52,9 +52,13 @@ def parse_proxy_pool(value: Optional[str]) -> List[str]:
 
 
 def load_state_files(state_dir: str) -> List[str]:
-    if not state_dir:
-        return []
-    if not os.path.isdir(state_dir):
+    """列出可用账号名（优先 DB，兼容文件目录扫描）。"""
+    from src.services.account_state_store import list_account_names
+    names = list_account_names()
+    if names:
+        return names
+    # 兼容：DB 无数据时回退文件扫描
+    if not state_dir or not os.path.isdir(state_dir):
         return []
     files = []
     for name in os.listdir(state_dir):

@@ -5,7 +5,10 @@ services:
     pull_policy: always
     init: true
     ports:
-      - "8000:8000"
+      # 与 .env 中 SERVER_PORT 一致（默认 8000）
+      - "${SERVER_PORT:-8000}:${SERVER_PORT:-8000}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file:
       - .env
     volumes:

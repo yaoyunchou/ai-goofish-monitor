@@ -120,7 +120,11 @@ async def _parse_user_items_data(items_json: list) -> list:
             "商品标题": data.get('title'),
             "商品价格": data.get('priceInfo', {}).get('price'),
             "商品主图": data.get('picInfo', {}).get('picUrl'),
-            "商品状态": status_text
+            "商品状态": status_text,
+            "想要数": data.get('wantCnt'),
+            "浏览数": data.get('browseCnt'),
+            "收藏数": data.get('collectCnt'),
+            "已售数": data.get('soldCnt'),
         })
     return parsed_list
 

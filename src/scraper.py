@@ -551,15 +551,12 @@ async def scrape_xianyu(task_config: dict, debug_limit: int = 0):
         processed_item_count = 0
         stop_scraping = False
 
-        if not os.path.exists(state_file):
-            raise FileNotFoundError(f"登录状态文件不存在: {state_file}")
-
-        snapshot_data = None
-        try:
-            with open(state_file, "r", encoding="utf-8") as f:
-                snapshot_data = json.load(f)
-        except Exception as e:
-            print(f"警告：读取登录状态文件失败，将直接按路径使用: {e}")
+        from src.services.account_state_store import get_account_state
+        snapshot_data = get_account_state(state_file)
+        if snapshot_data is None:
+            raise FileNotFoundError(f"登录状态不存在: {state_file}")
+        if not isinstance(snapshot_data, dict):
+            snapshot_data = None
 
         async with async_playwright() as p:
             # 反检测启动参数
