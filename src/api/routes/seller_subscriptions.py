@@ -247,13 +247,12 @@ async def delete_seller_subscription(subscription_id: int):
     deleted = result.get("deleted") or {}
 
     item_count = int(deleted.get("seller_subscription_items") or 0)
+    daily_count = int(deleted.get("seller_item_daily_metrics") or 0)
+    cleaned = max(item_count, daily_count)
 
     return {
-
-        "message": f"订阅已删除，同步清理 {item_count} 个商品",
-
+        "message": f"订阅已删除，同步清理 {cleaned} 个商品",
         "deleted": deleted,
-
     }
 
 

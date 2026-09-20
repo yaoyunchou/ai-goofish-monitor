@@ -23,10 +23,25 @@ from src.time_utils import shanghai_today, to_shanghai_iso
 
 TASK_NAME = SELLER_SUBSCRIPTION_TASK_NAME
 
-SQL_HAS_DATA = """
+# 看板聚合忽略已退订卖家的残留日指标。
+SQL_SUBSCRIBED_SELLER = """
+EXISTS (
+  SELECT 1 FROM seller_subscriptions sub
+  WHERE sub.seller_user_id = seller_item_daily_metrics.seller_user_id
+)
+"""
+SQL_SUBSCRIBED_SELLER_M = """
+EXISTS (
+  SELECT 1 FROM seller_subscriptions sub
+  WHERE sub.seller_user_id = m.seller_user_id
+)
+"""
+
+SQL_HAS_DATA = f"""
 SELECT 1
 FROM seller_item_daily_metrics
 WHERE task_name = ?
+  AND {SQL_SUBSCRIBED_SELLER}
 LIMIT 1
 """
 
@@ -36,14 +51,15 @@ FROM seller_subscriptions
 WHERE enabled IS TRUE
 """
 
-SQL_ANCHOR_DAY = """
+SQL_ANCHOR_DAY = f"""
 SELECT MAX(snapshot_day) AS anchor_day
 FROM seller_item_daily_metrics
 WHERE task_name = ?
   AND snapshot_day BETWEEN ? AND ?
+  AND {SQL_SUBSCRIBED_SELLER}
 """
 
-SQL_CARDS = """
+SQL_CARDS = f"""
 SELECT
   COUNT(DISTINCT item_id) AS item_count,
   COUNT(DISTINCT seller_user_id) AS shops_with_data,
@@ -53,18 +69,20 @@ SELECT
 FROM seller_item_daily_metrics
 WHERE task_name = ?
   AND snapshot_day = ?
+  AND {SQL_SUBSCRIBED_SELLER}
 """
 
-SQL_RANGE_DISTINCT = """
+SQL_RANGE_DISTINCT = f"""
 SELECT
   COUNT(DISTINCT item_id) AS item_count,
   COUNT(DISTINCT seller_user_id) AS shops_with_data
 FROM seller_item_daily_metrics
 WHERE task_name = ?
   AND snapshot_day BETWEEN ? AND ?
+  AND {SQL_SUBSCRIBED_SELLER}
 """
 
-SQL_TREND = """
+SQL_TREND = f"""
 WITH days AS (
   SELECT generate_series(?::date, ?::date, interval '1 day')::date AS snapshot_day
 ),
@@ -76,6 +94,7 @@ agg AS (
   FROM seller_item_daily_metrics
   WHERE task_name = ?
     AND snapshot_day BETWEEN ? AND ?
+    AND {SQL_SUBSCRIBED_SELLER}
   GROUP BY snapshot_day
 )
 SELECT
@@ -87,7 +106,7 @@ LEFT JOIN agg a ON a.snapshot_day = d.snapshot_day
 ORDER BY d.snapshot_day
 """
 
-SQL_SHOP_RANKING = """
+SQL_SHOP_RANKING = f"""
 WITH shop_agg AS (
   SELECT
     seller_user_id,
@@ -97,6 +116,7 @@ WITH shop_agg AS (
   FROM seller_item_daily_metrics
   WHERE task_name = ?
     AND snapshot_day = ?
+    AND {SQL_SUBSCRIBED_SELLER}
   GROUP BY seller_user_id
 )
 SELECT
@@ -107,7 +127,7 @@ SELECT
   COALESCE(p.nickname, s.nickname, a.seller_user_id) AS shop_name,
   COALESCE(s.enabled, FALSE) AS enabled
 FROM shop_agg a
-LEFT JOIN seller_subscriptions s ON s.seller_user_id = a.seller_user_id
+INNER JOIN seller_subscriptions s ON s.seller_user_id = a.seller_user_id
 LEFT JOIN LATERAL (
   SELECT nickname
   FROM seller_profiles
@@ -119,7 +139,7 @@ LEFT JOIN LATERAL (
 ORDER BY a.view_sum DESC NULLS LAST
 """
 
-SQL_HOT_ITEMS = """
+SQL_HOT_ITEMS = f"""
 SELECT
   m.item_id,
   m.seller_user_id,
@@ -132,7 +152,7 @@ LEFT JOIN seller_subscription_items i
   ON i.task_name = m.task_name
  AND i.seller_user_id = m.seller_user_id
  AND i.item_id = m.item_id
-LEFT JOIN seller_subscriptions s ON s.seller_user_id = m.seller_user_id
+INNER JOIN seller_subscriptions s ON s.seller_user_id = m.seller_user_id
 LEFT JOIN LATERAL (
   SELECT nickname
   FROM seller_profiles
@@ -143,6 +163,7 @@ LEFT JOIN LATERAL (
 ) p ON TRUE
 WHERE m.task_name = ?
   AND m.snapshot_day = ?
+  AND {SQL_SUBSCRIBED_SELLER_M}
 ORDER BY m.view_count DESC NULLS LAST
 LIMIT 10
 """

@@ -1,5 +1,14 @@
 # 变更日志
 
+## 2026-09-20
+
+### fix(seller-subscription): 删除订阅后商品列表不再继续展示该店数据
+
+- 原因：订阅行已删，但日指标/商品主表仍残留（进程未加载级联删除，或历史只删了 `seller_subscriptions`）
+- 商品列表、计数、店铺分析聚合改为只统计**仍在订阅表**的卖家；看板排行/热门改为 INNER JOIN 订阅
+- 清理当前库中 `2222329704966`（妮吧啦啦）的孤儿商品/日指标
+- 回归：`test_items_api_hides_unsubscribed_seller_after_delete`
+
 ## 2026-09-18
 
 ### fix(seller-subscription): 日志显式报告「整店跳过」，并澄清每店独立配额

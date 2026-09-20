@@ -127,3 +127,40 @@ def test_upsert_new_day_inserts_raw_and_metrics():
     assert "INSERT INTO crawl_raw_records" in insert_raw_sql
     insert_metrics_sql = conn.execute.call_args_list[3][0][0]
     assert "INSERT INTO seller_item_daily_metrics" in insert_metrics_sql
+
+
+def test_list_latest_daily_metrics_sql_requires_active_subscription():
+    captured: list[str] = []
+
+    class _Conn:
+        def execute(self, sql, params=None):
+            captured.append(" ".join(sql.split()))
+            cur = MagicMock()
+            cur.fetchall.return_value = []
+            cur.fetchone.return_value = {"total": 0}
+            return cur
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    with (
+        patch("src.services.seller_item_daily_storage.bootstrap_storage"),
+        patch("src.services.seller_item_daily_storage.db_connection", return_value=_Conn()),
+    ):
+        from src.services.seller_item_daily_storage import (
+            count_latest_item_daily_metrics_sync,
+            list_latest_item_daily_metrics_paginated_sync,
+            list_latest_item_daily_metrics_sync,
+        )
+
+        list_latest_item_daily_metrics_sync("seller_subscriptions")
+        list_latest_item_daily_metrics_paginated_sync("seller_subscriptions")
+        count_latest_item_daily_metrics_sync("seller_subscriptions")
+
+    assert captured
+    for sql in captured:
+        assert "FROM seller_subscriptions" in sql
+        assert "m.seller_user_id" in sql

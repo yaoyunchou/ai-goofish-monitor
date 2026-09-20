@@ -225,8 +225,10 @@ def test_dashboard_sql_uses_group_by_not_select_star():
     compact = " ".join(sqls.split())
     assert "SELECT * FROM seller_item_daily_metrics" not in compact
     assert "COALESCE(a.want_sum" not in sqls
+    assert "FROM seller_subscriptions sub" in sqls
     for fragment in (SQL_TREND, SQL_CARDS, SQL_RANGE_DISTINCT, SQL_SHOP_RANKING, SQL_HOT_ITEMS):
         assert "SELECT *" not in " ".join(fragment.split())
+        assert "seller_subscriptions" in fragment
 
 
 def test_shop_name_falls_back_to_seller_user_id():

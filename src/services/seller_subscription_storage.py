@@ -300,6 +300,10 @@ _ITEM_SORT_COLUMNS = {
     "snapshot_time": "snapshot_time",
 }
 
+_SQL_LEGACY_ITEM_SUBSCRIBED = (
+    "EXISTS (SELECT 1 FROM seller_subscriptions s WHERE s.seller_user_id = seller_item_metrics.seller_user_id)"
+)
+
 
 def _latest_item_metrics_inner_sql(conditions: list[str]) -> str:
     """每个商品最新快照的子查询（DISTINCT ON item_id）。"""
@@ -328,7 +332,7 @@ def list_latest_item_metrics_sync(
     if daily:
         return daily
     bootstrap_storage()
-    conditions = ["task_name = ?"]
+    conditions = ["task_name = ?", _SQL_LEGACY_ITEM_SUBSCRIBED]
     params: list[Any] = [task_name]
     if seller_user_id:
         conditions.append("seller_user_id = ?")
@@ -373,7 +377,7 @@ def list_latest_item_metrics_paginated_sync(
             sort_order=sort_order,
         )
     bootstrap_storage()
-    conditions = ["task_name = ?"]
+    conditions = ["task_name = ?", _SQL_LEGACY_ITEM_SUBSCRIBED]
     params: list[Any] = [task_name]
     if seller_user_id:
         conditions.append("seller_user_id = ?")
@@ -408,7 +412,7 @@ def count_latest_item_metrics_sync(
     if daily_count > 0:
         return daily_count
     bootstrap_storage()
-    conditions = ["task_name = ?"]
+    conditions = ["task_name = ?", _SQL_LEGACY_ITEM_SUBSCRIBED]
     params: list[Any] = [task_name]
     if seller_user_id:
         conditions.append("seller_user_id = ?")

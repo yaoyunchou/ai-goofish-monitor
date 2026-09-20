@@ -268,6 +268,11 @@ _ITEM_SORT_COLUMNS = {
     "snapshot_time": "captured_at",
 }
 
+# 商品列表/计数只展示仍在订阅表中的卖家，避免删订阅后孤儿日指标继续出现在 UI。
+SQL_ITEM_BELONGS_TO_SUBSCRIPTION = (
+    "EXISTS (SELECT 1 FROM seller_subscriptions s WHERE s.seller_user_id = m.seller_user_id)"
+)
+
 
 def list_item_daily_metrics_sync(
     task_name: str,
@@ -299,7 +304,7 @@ def list_latest_item_daily_metrics_sync(
     limit: int = 200,
 ) -> list[dict[str, Any]]:
     bootstrap_storage()
-    conditions = ["m.task_name = ?"]
+    conditions = ["m.task_name = ?", SQL_ITEM_BELONGS_TO_SUBSCRIPTION]
     params: list[Any] = [task_name]
     if seller_user_id:
         conditions.append("m.seller_user_id = ?")
@@ -326,7 +331,7 @@ def list_latest_item_daily_metrics_paginated_sync(
     sort_order: str = "desc",
 ) -> list[dict[str, Any]]:
     bootstrap_storage()
-    conditions = ["m.task_name = ?"]
+    conditions = ["m.task_name = ?", SQL_ITEM_BELONGS_TO_SUBSCRIPTION]
     params: list[Any] = [task_name]
     if seller_user_id:
         conditions.append("m.seller_user_id = ?")
@@ -358,7 +363,7 @@ def count_latest_item_daily_metrics_sync(
     search: str | None = None,
 ) -> int:
     bootstrap_storage()
-    conditions = ["m.task_name = ?"]
+    conditions = ["m.task_name = ?", SQL_ITEM_BELONGS_TO_SUBSCRIPTION]
     params: list[Any] = [task_name]
     if seller_user_id:
         conditions.append("m.seller_user_id = ?")
