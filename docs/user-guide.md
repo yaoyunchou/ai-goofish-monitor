@@ -107,6 +107,11 @@ NTFY_TOPIC_URL=https://ntfy.sh/你的topic
 
 仅同时有「想要」和「浏览量」的商品会入库。
 
+删除卖家时会**一并删除该卖家名下的商品数据**（商品主表、日指标、想要/浏览时序、
+画像、健康度判定记录与详情原始响应），删除后提示里会带上清理的商品数量。
+若在此之前删过卖家、商品仍残留，可用
+`python -m scripts.cleanup_orphan_seller_data`（先出报告，确认后加 `--apply`）清理。
+
 **界面参考**（闲鱼用户主页，订阅采集的数据来源）：
 
 ![闲鱼用户主页 — 宝贝列表与评价 Tab](./exploration/snapshots/personal_profile.png)

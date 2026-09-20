@@ -81,6 +81,12 @@ def test_seller_subscription_crud_and_schedule(subscription_api_client, offline_
 
     delete_res = api_client.delete(f"/api/seller-subscriptions/{subscription_id}")
     assert delete_res.status_code == 200
+    # 删除订阅必须级联清理该卖家的商品数据，响应里回带各表删除行数
+    delete_body = delete_res.json()
+    assert "deleted" in delete_body
+    assert "seller_subscription_items" in delete_body["deleted"]
+    gone = api_client.get("/api/seller-subscriptions")
+    assert all(item["id"] != subscription_id for item in gone.json()["items"])
 
 
 def test_stats_next_run_at_null_when_scheduler_has_no_job(monkeypatch):
