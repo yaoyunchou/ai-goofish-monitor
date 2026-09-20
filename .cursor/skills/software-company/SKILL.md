@@ -12,6 +12,24 @@ color: brand
 
 基于 `software-company/` 插件迁移的 Cursor 项目配置。
 
+## ⚠️ 铁律：只改代码，不要运行服务
+
+**团队所有成员（PM / 架构师 / 工程师 / QA）一律只修改代码，不得启动或运行任何服务。**
+
+- **禁止**代跑 `start.sh` / `start.bat` / `dev_start.bat` / `python -m src.app` /
+  `npm run dev` / `uvicorn ...` / `docker compose up` / `spider_v2.py` 等
+  任何会占用端口或产生常驻进程的命令。
+- 验证用**静态手段**：`pytest`、`npx vue-tsc -b --noEmit`、`npx vitest run`。
+  **不要**用「先起服务再 curl」的方式验证。
+- 确实启动了进程的，**必须在同一次任务内关闭**并确认端口释放。
+- 交付完成即结束，**不要**主动把服务跑起来给用户测试——运行一律由用户手动执行。
+
+## 本地端口约定
+
+- 本项目本地开发端口为 **8010**（读 `.env` 的 `SERVER_PORT`）。
+- 本机 **`8000` 被用户的另一个项目长期占用**，不要占用，也不要结束其进程。
+- 前端 dev server 使用 **5173**。
+
 ## 成员（`.cursor/agents/`）
 
 | 角色 | 调用方式 |

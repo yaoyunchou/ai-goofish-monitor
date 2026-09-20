@@ -2,6 +2,28 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠️ 首要规则：只改代码，不要运行服务（必读）
+
+**智能体只负责修改代码，不得启动或运行任何服务。所有运行一律由用户手动执行。**
+
+- **禁止**代跑 `start.sh` / `start.bat` / `dev_start.bat` / `python -m src.app` /
+  `npm run dev` / `uvicorn ...` / `docker compose up` / `spider_v2.py` 等
+  任何会占用端口或产生常驻进程的命令。
+- 验证改动请使用**静态手段**：`pytest`、`npx vue-tsc -b --noEmit`、`npx vitest run`、
+  代码阅读与类型检查。**不要**用「先起服务再 curl」的方式验证。
+- 如因特殊原因确实启动了进程，**必须在同一次任务内关闭**，并确认端口已释放。
+- 开发完成后**不要**主动把服务跑起来，也不要把「起服务给用户测试」当作收尾步骤。
+
+> 原因：历史上多次出现智能体启动的服务未关闭，遗留进程占用端口，
+> 导致用户下次手动启动时遭遇「端口被占用」，排查成本很高。
+
+## 本地端口约定
+
+- 本项目本地开发端口为 **8010**（读 `.env` 的 `SERVER_PORT`）。
+- 本机 **`8000` 被用户的另一个项目（「物流爬虫控制台」，`uvicorn server:app`）长期占用**，
+  不要占用它，也不要结束它的进程。
+- 前端 dev server 使用 **5173**。
+
 ## 项目概述
 
 基于 Playwright + AI 的闲鱼智能监控机器人。FastAPI 后端 + Vue 3 前端，支持多任务并发监控、多模态 AI 商品分析、多渠道通知推送。
@@ -38,7 +60,7 @@ API层 (src/api/routes/)
 # 后端开发
 python -m src.app
 # 或
-uvicorn src.app:app --host 0.0.0.0 --port 8000 --reload
+uvicorn src.app:app --host 0.0.0.0 --port 8010 --reload
 
 # 前端开发
 cd web-ui && npm install && npm run dev

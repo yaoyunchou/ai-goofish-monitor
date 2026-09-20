@@ -33,6 +33,11 @@ model: inherit
 
 ## 本项目约定
 
+- **只改代码，不要运行服务**：禁止代跑 `start.bat` / `dev_start.bat` /
+  `python -m src.app` / `npm run dev` / `uvicorn` 等会占端口或起常驻进程的命令。
+  验证只用静态手段（`pytest`、`vue-tsc`、`vitest`）。**运行一律由用户手动执行。**
+  万一起了进程，必须立刻关闭并确认端口释放。
+- 本地端口 **8010**；`8000` 被用户另一个项目占用，勿动；前端 5173
 - 后端：`src/` 分层（api → services → domain → infrastructure）
 - 前端：`web-ui/` Vue 3 + Vite + shadcn-vue
 - 测试：`pytest`，`tests/**/test_*.py`

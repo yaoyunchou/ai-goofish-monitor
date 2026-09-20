@@ -40,6 +40,12 @@ model: inherit
 ## 本项目
 
 优先运行：`pytest` 或 `pytest tests/unit/test_xxx.py`（与变更范围相关）。
+前端：`cd web-ui && npx vitest run`；类型检查 `npx vue-tsc -b --noEmit`。
+
+- **只跑测试，不要起服务**：禁止 `start.bat` / `dev_start.bat` /
+  `python -m src.app` / `npm run dev` / `uvicorn` 等会占端口或起常驻进程的命令。
+  不要用「起服务 + curl」做验证。**运行一律由用户手动执行。**
+- 本地端口 **8010**；`8000` 被用户另一个项目占用，勿动；前端 5173。
 
 ## Cursor 协作
 
