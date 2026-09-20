@@ -8,6 +8,8 @@
 """
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, patch
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -62,12 +64,19 @@ def test_health_run_endpoint_exists():
 
 
 def test_restore_endpoint_exists():
+    """路由必须存在，且请求能进到它自己的 handler。
+
+    注意：本地 .env 配了真实库时，unmute_item 会真的查库、查不到就返回 False，
+    handler 抛 404 —— 这和「路由被遮蔽」的 404 无法区分。所以这里把 unmute_item
+    打桩成成功，让断言只反映路由本身。
+    """
     client = _client()
-    response = client.post(
-        "/api/seller-subscriptions/items/ITEM1/restore",
-        params={"seller_user_id": "seller-1"},
-    )
-    assert response.status_code != 404
+    with patch.object(routes_module, "unmute_item", new=AsyncMock(return_value=True)):
+        response = client.post(
+            "/api/seller-subscriptions/items/ITEM1/restore",
+            params={"seller_user_id": "seller-1"},
+        )
+    assert response.status_code == 200
 
 
 def test_health_rejects_bad_week_start_format():
