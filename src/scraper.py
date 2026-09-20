@@ -500,10 +500,25 @@ async def scrape_user_profile(
                 await random_sleep(1, 2)
         if not all_items:
             page_title = await page.title()
-            print(
-                f"      [警告] 商品列表 API 未返回数据（页面标题: {page_title}）。"
-                "请检查登录态 state.json 是否有效。"
-            )
+            # 「我的闲鱼」是登录者本人主页的标题。请求的是别人的主页却停在这里，
+            # 说明该卖家主页没打开（关停/注销/不可访问），闲鱼回落到了自己的主页。
+            # 这种情况与登录态无关，别再误导去查 state.json。
+            if "我的闲鱼" in (page_title or ""):
+                print(
+                    f"      [警告] 商品列表 API 未返回数据，页面停留在「{page_title}」，"
+                    f"未能打开卖家 {user_id} 的主页。"
+                )
+                print(
+                    "             该店铺可能已关停 / 注销 / 全部下架 / 不可访问，"
+                    "或触发了风控被回落。请手动访问 "
+                    f"https://www.goofish.com/personal?userId={user_id} 确认。"
+                    "（注意：这与登录态无关。）"
+                )
+            else:
+                print(
+                    f"      [警告] 商品列表 API 未返回数据（页面标题: {page_title}）。"
+                    "请检查登录态 state.json 是否有效。"
+                )
         item_cards = all_items[:max_items] if max_items else all_items
         profile_data["卖家发布的商品列表"] = await _parse_user_items_data(item_cards)
         print(f"      [采集阶段] 商品列表解析完成：原始 {len(all_items)} 条，入库用 {len(item_cards)} 条。")
