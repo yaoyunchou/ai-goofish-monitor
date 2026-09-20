@@ -20,6 +20,18 @@ _SUBSCRIPTION_TIME_FIELDS = (
     "last_run_at",
 )
 
+# 删除卖家订阅时需要一并清理的关联表（均以 seller_user_id 归属）。
+# crawl_raw_records 不在此列：它没有卖家字段，只能通过 seller_item_daily_metrics
+# 的 raw_record_id 反查后单独删除。
+SELLER_RELATED_TABLES = (
+    "seller_subscription_items",
+    "seller_item_daily_metrics",
+    "seller_item_metrics",
+    "item_monitor_health_weekly",
+    "seller_profiles",
+    "item_detail_api_raw",
+)
+
 
 def _normalize_time_fields(row: dict[str, Any], fields: tuple[str, ...] = _SUBSCRIPTION_TIME_FIELDS) -> dict[str, Any]:
     for key in fields:
@@ -537,15 +549,79 @@ def update_subscription_sync(subscription_id: int, **fields) -> dict[str, Any] |
     return get_subscription_sync(subscription_id)
 
 
-def delete_subscription_sync(subscription_id: int) -> bool:
+def _delete_seller_related_data(conn, seller_user_id: str) -> dict[str, int]:
+    """删除某卖家名下的全部商品/画像/健康度数据，返回各表删除行数。
+
+    调用方负责事务提交（本函数不 commit），以便与订阅行删除保持原子性。
+    """
+    deleted: dict[str, int] = {}
+
+    # seller_item_daily_metrics 与 crawl_raw_records 严格 1:1（UNIQUE(raw_record_id)），
+    # 所以要先取 raw id —— 指标行删掉后就再也查不到这些 raw 归属了。
+    raw_rows = conn.execute(
+        "SELECT raw_record_id FROM seller_item_daily_metrics WHERE seller_user_id = ?",
+        (seller_user_id,),
+    ).fetchall()
+    raw_ids = [int(row["raw_record_id"]) for row in raw_rows if row["raw_record_id"] is not None]
+
+    for table in SELLER_RELATED_TABLES:
+        cursor = conn.execute(
+            f"DELETE FROM {table} WHERE seller_user_id = ?",
+            (seller_user_id,),
+        )
+        deleted[table] = int(cursor.rowcount or 0)
+
+    if raw_ids:
+        placeholders = ", ".join(["?"] * len(raw_ids))
+        cursor = conn.execute(
+            f"DELETE FROM crawl_raw_records WHERE id IN ({placeholders})",
+            tuple(raw_ids),
+        )
+        deleted["crawl_raw_records"] = int(cursor.rowcount or 0)
+
+    return deleted
+
+
+def delete_seller_related_data_sync(seller_user_id: str) -> dict[str, int]:
+    """单独清理某卖家的关联数据（用于清理历史遗留孤儿数据）。"""
     bootstrap_storage()
     with db_connection() as conn:
+        deleted = _delete_seller_related_data(conn, seller_user_id)
+        conn.commit()
+    return deleted
+
+
+def delete_subscription_with_stats_sync(subscription_id: int) -> dict[str, Any] | None:
+    """删除订阅，并级联删除该卖家名下的商品/画像/健康度数据。
+
+    顺序很关键：必须先按 id 查出 seller_user_id 再删订阅行，
+    否则订阅删掉后就再也查不到这批数据属于哪个卖家了。
+
+    返回清理统计；订阅不存在时返回 None。
+    """
+    bootstrap_storage()
+    with db_connection() as conn:
+        row = conn.execute(
+            "SELECT seller_user_id FROM seller_subscriptions WHERE id = ?",
+            (subscription_id,),
+        ).fetchone()
+        if not row:
+            return None
+        seller_user_id = str(row["seller_user_id"]) if row["seller_user_id"] else None
+        deleted = _delete_seller_related_data(conn, seller_user_id) if seller_user_id else {}
         cursor = conn.execute(
             "DELETE FROM seller_subscriptions WHERE id = ?",
             (subscription_id,),
         )
         conn.commit()
-    return cursor.rowcount > 0
+        if cursor.rowcount <= 0:
+            return None
+    return {"seller_user_id": seller_user_id, "deleted": deleted}
+
+
+def delete_subscription_sync(subscription_id: int) -> bool:
+    """删除订阅（含关联数据）；仅返回订阅行是否真的被删掉。"""
+    return delete_subscription_with_stats_sync(subscription_id) is not None
 
 
 def list_enabled_seller_ids_sync() -> list[str]:
@@ -719,6 +795,14 @@ async def update_subscription(subscription_id: int, **fields) -> dict[str, Any] 
 
 async def delete_subscription(subscription_id: int) -> bool:
     return await asyncio.to_thread(delete_subscription_sync, subscription_id)
+
+
+async def delete_subscription_with_stats(subscription_id: int) -> dict[str, Any] | None:
+    return await asyncio.to_thread(delete_subscription_with_stats_sync, subscription_id)
+
+
+async def delete_seller_related_data(seller_user_id: str) -> dict[str, int]:
+    return await asyncio.to_thread(delete_seller_related_data_sync, seller_user_id)
 
 
 async def list_enabled_seller_ids() -> list[str]:

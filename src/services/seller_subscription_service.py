@@ -30,7 +30,7 @@ from src.services.seller_subscription_storage import (
 
     add_subscription,
 
-    delete_subscription,
+    delete_subscription_with_stats,
 
     get_schedule,
 
@@ -110,11 +110,17 @@ async def patch_subscription(subscription_id: int, payload: SellerSubscriptionUp
 
 
 
-async def remove_subscription(subscription_id: int) -> None:
+async def remove_subscription(subscription_id: int) -> dict:
 
-    if not await delete_subscription(subscription_id):
+    """删除订阅，并级联清理该卖家名下的商品/画像/健康度数据。"""
+
+    result = await delete_subscription_with_stats(subscription_id)
+
+    if result is None:
 
         raise ValueError("订阅不存在")
+
+    return result
 
 
 

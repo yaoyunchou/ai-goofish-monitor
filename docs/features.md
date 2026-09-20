@@ -279,7 +279,7 @@
 | PATCH | `/api/seller-subscriptions/schedule` | 更新全局 Cron/限额/账号策略 |
 | POST | `/api/seller-subscriptions/run` | 手动启动采集子进程 |
 | PATCH | `/api/seller-subscriptions/{id}` | 更新单条订阅 |
-| DELETE | `/api/seller-subscriptions/{id}` | 删除订阅 |
+| DELETE | `/api/seller-subscriptions/{id}` | 删除订阅，并级联清理该卖家名下的商品/画像/健康度数据（返回 `deleted` 各表删除行数） |
 | GET | `/api/seller-subscriptions/profiles` | 最新卖家画像列表 |
 | GET | `/api/seller-subscriptions/items` | 商品分页列表（`seller_id`/`search`/`sort_by`/`sort_order`） |
 | GET | `/api/seller-subscriptions/items/{item_id}/detail` | 商品详情（指标 + 详情 API） |
@@ -521,7 +521,13 @@ python3 -m scripts.verify_database                 # 验证数据库连通与表
 python3 -m scripts.migrate_sqlite_to_postgres      # SQLite → Postgres 一次性迁移
    --source data/app.sqlite3 --dry-run             # 预演
 python3 -m scripts.check_env_keys                  # 检查环境变量是否注入（脱敏）
+python3 -m scripts.cleanup_orphan_seller_data      # 报告删除订阅后残留的孤儿商品数据
+   --apply                                        # 确认后真正删除
+   --seller <user_id>                             # 只处理指定卖家
 ```
+
+> 卖家订阅删除已改为**级联删除**（商品、日指标、画像、健康度记录一并清理）。
+> 上述脚本只用于清理改动之前遗留的孤儿数据。
 
 ### 10.3 桌面启动器
 

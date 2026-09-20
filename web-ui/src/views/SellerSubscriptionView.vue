@@ -212,8 +212,9 @@ async function handleEditSeller() {
 
 async function handleDelete(row: SellerSubscription) {
   try {
-    await deleteSellerSubscription(row.id)
-    toast({ title: t('sellerSubscription.deleted') })
+    const result = await deleteSellerSubscription(row.id)
+    // 后端会级联清理该卖家的商品/画像/健康度数据，message 里带清理数量
+    toast({ title: t('sellerSubscription.deleted'), description: result?.message })
     onFilterChange()
     await load()
   } catch (e) {

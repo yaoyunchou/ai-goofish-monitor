@@ -130,8 +130,18 @@ export async function updateSellerSubscription(
   )
 }
 
-export async function deleteSellerSubscription(id: number) {
-  return await http(`/api/seller-subscriptions/${id}`, { method: 'DELETE' })
+export interface DeleteSellerSubscriptionResult {
+  message: string
+  /** 级联清理的各表删除行数，键为表名 */
+  deleted?: Record<string, number>
+}
+
+export async function deleteSellerSubscription(
+  id: number,
+): Promise<DeleteSellerSubscriptionResult> {
+  return await http<DeleteSellerSubscriptionResult>(`/api/seller-subscriptions/${id}`, {
+    method: 'DELETE',
+  })
 }
 
 export async function updateSellerSubscriptionSchedule(

@@ -232,9 +232,7 @@ async def delete_seller_subscription(subscription_id: int):
 
     try:
 
-        await remove_subscription(subscription_id)
-
-        return {"message": "订阅已删除"}
+        result = await remove_subscription(subscription_id)
 
     except ValueError as exc:
 
@@ -243,6 +241,20 @@ async def delete_seller_subscription(subscription_id: int):
     except Exception as exc:
 
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+
+    deleted = result.get("deleted") or {}
+
+    item_count = int(deleted.get("seller_subscription_items") or 0)
+
+    return {
+
+        "message": f"订阅已删除，同步清理 {item_count} 个商品",
+
+        "deleted": deleted,
+
+    }
 
 
 
