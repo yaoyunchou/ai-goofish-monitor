@@ -491,3 +491,24 @@ def test_scrape_reports_whole_skipped_seller_in_summary(capsys):
     assert "主页无在售商品" in out
     # 被跳过的店不应出现在「有商品入库」里
     assert "跳过店铺 11111111111" not in out
+
+
+def test_still_subscribed_true_when_subscription_exists():
+    mod = _load_scraper_module()
+    with patch.object(mod, "get_subscription_by_user_sync", return_value={"id": 1}):
+        assert mod._still_subscribed("2221197154547") is True
+
+
+def test_still_subscribed_false_when_subscription_deleted():
+    """订阅被删除 → 采集途中必须识别出来，否则会把刚清干净的商品又写回去。"""
+    mod = _load_scraper_module()
+    with patch.object(mod, "get_subscription_by_user_sync", return_value=None):
+        assert mod._still_subscribed("2221197154547") is False
+
+
+def test_still_subscribed_fails_open_on_db_error(capsys):
+    """DB 读不到时按「仍订阅」处理：这只是保护，不能中断整轮采集。"""
+    mod = _load_scraper_module()
+    with patch.object(mod, "get_subscription_by_user_sync", side_effect=RuntimeError("db down")):
+        assert mod._still_subscribed("2221197154547") is True
+    assert "校验卖家" in capsys.readouterr().out

@@ -24,6 +24,7 @@ from src.services.seller_item_daily_storage import (
 )
 from src.time_utils import shanghai_now_iso
 from src.services.seller_subscription_storage import (
+    get_subscription_by_user_sync,
     list_subscriptions_sync,
     record_subscription_run,
     save_seller_profile,
@@ -79,7 +80,18 @@ def _order_seller_ids_for_alignment(seller_ids: list[str], never_ids: set[str]) 
     return sorted(seller_ids, key=lambda user_id: (0 if user_id in never_ids else 1, user_id))
 
 
-async def scrape_seller_subscription(task_config: dict, debug_limit: int = 0) -> int:
+async def scrape_seller_subscription(
+    task_config: dict,
+    debug_limit: int = 0,
+    *,
+    from_registry: bool = False,
+) -> int:
+    """采集一批卖家。
+
+    from_registry=True 表示卖家列表取自订阅注册表（而非任务里写死的卖家），
+    此时才会在采集每个卖家前复查订阅是否还在——防止「采集中途被删除」
+    导致商品数据在清理后又写回来。历史任务里写死的卖家不受此校验影响。
+    """
     task_name = task_config.get("task_name") or SELLER_SUBSCRIPTION_TASK_NAME
     seller_ids = parse_seller_user_ids(
         task_config.get("seller_user_ids"),
@@ -98,6 +110,7 @@ async def scrape_seller_subscription(task_config: dict, debug_limit: int = 0) ->
         task_config=scrape_config,
         debug_limit=debug_limit,
         touch_registry=task_name == SELLER_SUBSCRIPTION_TASK_NAME,
+        skip_unsubscribed=from_registry,
     )
 
 
@@ -110,7 +123,9 @@ async def scrape_registered_seller_subscriptions(debug_limit: int = 0) -> int:
         await record_subscription_run("没有启用的卖家订阅", saved=0, ok=False)
         return 0
     try:
-        saved = await scrape_seller_subscription(task_config, debug_limit=debug_limit)
+        saved = await scrape_seller_subscription(
+            task_config, debug_limit=debug_limit, from_registry=True
+        )
     except Exception as exc:
         await record_subscription_run(f"采集异常: {exc}", saved=0, ok=False)
         raise
@@ -169,11 +184,24 @@ def _build_work_queue(
     return phase_missing, phase_updates
 
 
+def _still_subscribed(user_id: str) -> bool:
+    """订阅是否仍然存在。
+
+    DB 读不到时按「仍订阅」处理：这只是防写回的保护，不应中断整轮采集。
+    """
+    try:
+        return get_subscription_by_user_sync(user_id) is not None
+    except Exception as exc:
+        print(f"   [警告] 校验卖家 {user_id} 的订阅是否存在失败，按仍订阅处理: {exc}")
+        return True
+
+
 async def _scrape_seller_ids(
     *,
     task_config: dict,
     debug_limit: int,
     touch_registry: bool,
+    skip_unsubscribed: bool = False,
 ) -> int:
     task_name = task_config.get("task_name") or SELLER_SUBSCRIPTION_TASK_NAME
     keyword = task_config.get("keyword") or task_name
@@ -204,6 +232,14 @@ async def _scrape_seller_ids(
 
         for seller_index, user_id in enumerate(seller_ids):
             await pacing.before_list_alignment(seller_index)
+
+            # seller_ids 是任务开始时快照的。若采集途中该订阅被删除，
+            # 这里必须再确认一次，否则跑完会把刚清干净的商品数据又写回去。
+            if skip_unsubscribed and not _still_subscribed(str(user_id)):
+                print(f"   [跳过] 卖家 {user_id} 的订阅已不存在（已被删除），不再采集其商品。")
+                skipped_sellers.append((str(user_id), "订阅已被删除"))
+                continue
+
             print(f"\n=== 拉取卖家主页 {user_id}（监控前 {item_limit} 条在售商品）===")
             await pacing.before_profile()
             profile = await scrape_user_profile(
