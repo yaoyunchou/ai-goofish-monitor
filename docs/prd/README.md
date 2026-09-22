@@ -12,6 +12,7 @@
 | [店铺数据 · 卖家订阅看板](./shop-analytics-subscription-dashboard.md) | **已交付** | `/shop-analytics` 用订阅日指标（想要/浏览），不再被空罗盘挡住 |
 | [商品监控健康度与自动停用](./item-monitor-health.md) | **已交付（默认安全空跑）** | 周判定已上；默认 `MONITOR_AUTO_DISABLE_ENABLED=false`、`MONITOR_DRY_RUN=true`，不自动停用生产数据 |
 | [项目健康度与缺口分析](./project-health.md) | **历史基线** | 2026-09-16 审计；文内数字已过时，以 `docs/features.md` / CI 为准 |
+| [小红书公开商品监控](./xhs-monitor.md) | **本期实现** | 独立菜单；公开页；高水位差值。不改闲鱼想要/浏览 |
 
 ## 约定
 

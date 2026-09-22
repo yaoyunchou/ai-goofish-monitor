@@ -12,6 +12,8 @@
 | [店铺分析看板](./design/shop-analytics-subscription-dashboard.md) | `GET /api/shop-analytics/dashboard` |
 | [卖家订阅采集方案](./design/seller-subscription-scrape.md) | 风控秒数、无头、调度与实现索引 |
 | [商品监控健康度](./design/item-monitor-health.md) | 周健康度；默认 dry-run |
+| [小红书公开商品监控](./design/xhs-monitor.md) | 公开页采集、高水位、独立调度 |
+| [变化算法对照](./design/metric-delta-comparison.md) | 闲鱼周差值与小红书高水位的案例对比 |
 | [PostgreSQL 接入](./design/database-supabase-integration.md) | 数据库连接与迁移 |
 | [MySQL 迁移计划（归档）](./design/database-mysql-migration-plan.md) | 已废弃，勿再跟 |
 | [产品需求 PRD](./prd/README.md) | 做什么、验收标准 |

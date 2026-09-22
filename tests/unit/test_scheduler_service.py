@@ -104,6 +104,18 @@ def test_reload_jobs_keeps_seller_subscription_job():
     assert scheduler.scheduler.get_job("task_1") is not None
 
 
+def test_reload_jobs_keeps_xhs_monitor_job():
+    process = _FakeProcessService()
+    scheduler = SchedulerService(process)
+    asyncio.run(scheduler.reload_xhs_job({"enabled": True, "cron": "0 * * * *"}))
+    asyncio.run(scheduler.reload_jobs([_keyword_task(1)]))
+    job = scheduler.scheduler.get_job("xhs_monitor")
+    assert job is not None
+    assert job.misfire_grace_time == 3600
+    asyncio.run(scheduler.reload_xhs_job({"enabled": False, "cron": "0 * * * *"}))
+    assert scheduler.scheduler.get_job("xhs_monitor") is None
+
+
 def test_reload_jobs_replaces_keyword_jobs_without_removing_subscription():
     process = _FakeProcessService()
     scheduler = SchedulerService(process)

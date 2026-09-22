@@ -264,13 +264,9 @@ if /i "%MODE%"=="build" goto :do_build
 set "NEED_BUILD=1"
 if exist "dist\index.html" (
     set "NEED_BUILD=0"
-    for /f "delims=" %%f in ('dir /b /s /a-d "web-ui\src" 2^>nul') do (
-        if "!NEED_BUILD!"=="0" (
-            for %%d in ("dist\index.html") do (
-                if "%%~tf" LSS "%%~tf" set "NEED_BUILD=1"
-            )
-        )
-    )
+    REM Compare source mtime with dist\index.html. The old check used %%~tf on both sides, so it never rebuilt.
+    powershell -NoProfile -Command "$dist=(Get-Item 'dist\index.html').LastWriteTime; if (Get-ChildItem -Recurse -File 'web-ui\src' | Where-Object { $_.LastWriteTime -gt $dist } | Select-Object -First 1) { exit 2 } else { exit 0 }"
+    if errorlevel 2 set "NEED_BUILD=1"
 )
 
 if "!NEED_BUILD!"=="0" (

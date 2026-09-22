@@ -220,6 +220,57 @@ _INCREMENTAL_SCHEMA_STATEMENTS = [
     """,
     "CREATE INDEX IF NOT EXISTS idx_item_monitor_health_week ON item_monitor_health_weekly (week_start DESC, action)",
     "CREATE INDEX IF NOT EXISTS idx_item_monitor_health_item ON item_monitor_health_weekly (seller_user_id, item_id, week_start DESC)",
+    # --- 小红书公开商品监控（快照只追加） ---
+    """
+    CREATE TABLE IF NOT EXISTS xhs_products (
+        id TEXT PRIMARY KEY,
+        source_url TEXT,
+        title TEXT,
+        shop_name TEXT,
+        cover_url TEXT,
+        price DOUBLE PRECISION,
+        active BOOLEAN NOT NULL DEFAULT TRUE,
+        last_error TEXT,
+        last_status TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS xhs_snapshots (
+        id BIGSERIAL PRIMARY KEY,
+        product_id TEXT NOT NULL REFERENCES xhs_products(id) ON DELETE CASCADE,
+        captured_at TIMESTAMPTZ NOT NULL,
+        sold INTEGER,
+        price DOUBLE PRECISION,
+        raw_note TEXT
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_xhs_snapshots_product_time ON xhs_snapshots (product_id, captured_at)",
+    """
+    CREATE TABLE IF NOT EXISTS xhs_schedule (
+        id INTEGER PRIMARY KEY,
+        cron TEXT NOT NULL DEFAULT '0 * * * *',
+        enabled BOOLEAN NOT NULL DEFAULT FALSE,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+    """,
+    """
+    INSERT INTO xhs_schedule (id, cron, enabled)
+    VALUES (1, '0 * * * *', FALSE)
+    ON CONFLICT (id) DO NOTHING
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS xhs_shops (
+        id BIGSERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+    """,
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_xhs_shops_name ON xhs_shops (name)",
+    "ALTER TABLE xhs_products ADD COLUMN IF NOT EXISTS shop_id BIGINT",
+    "ALTER TABLE xhs_products ADD COLUMN IF NOT EXISTS category TEXT",
+    "ALTER TABLE xhs_products ADD COLUMN IF NOT EXISTS tags_json JSONB NOT NULL DEFAULT CAST('[]' AS jsonb)",
 ]
 
 

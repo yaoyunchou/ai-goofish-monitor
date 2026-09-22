@@ -16,6 +16,7 @@ from src.infrastructure.logging_config import configure_scheduler_file_logging
 from src.services.process_service import ProcessService
 
 MONITOR_HEALTH_JOB_ID = "item_monitor_health_weekly"
+XHS_JOB_ID = "xhs_monitor"
 DEFAULT_MONITOR_HEALTH_CRON = "0 9 * * 1"  # 每周一 09:00（Asia/Shanghai）
 # APScheduler 默认 misfire_grace_time=1 秒。Windows 上 asyncio.call_later 隔夜等待
 # 经常迟到数秒到数分钟，每日 Cron 会被直接判 missed、不跑采集。
@@ -185,6 +186,45 @@ class SchedulerService:
 
     def get_monitor_health_next_run_time(self):
         return self._job_next_run_time(MONITOR_HEALTH_JOB_ID)
+
+    def get_xhs_next_run_time(self):
+        return self._job_next_run_time(XHS_JOB_ID)
+
+    async def reload_xhs_job(self, schedule: dict):
+        """加载小红书公开商品采集。reload_jobs 只删 task_*，不会卸掉本 job。"""
+        existing = self.scheduler.get_job(XHS_JOB_ID)
+        if existing is not None:
+            self.scheduler.remove_job(XHS_JOB_ID)
+        if schedule.get("enabled") and schedule.get("cron"):
+            try:
+                trigger = build_cron_trigger(
+                    schedule["cron"],
+                    timezone=self.scheduler.timezone,
+                )
+                self.scheduler.add_job(
+                    self._run_xhs,
+                    trigger=trigger,
+                    id=XHS_JOB_ID,
+                    name="Scheduled: xhs public products",
+                    **self._cron_job_options(),
+                )
+                print(f"  -> 已为小红书监控添加定时规则: '{schedule['cron']}'")
+            except ValueError as exc:
+                print(f"  -> [警告] 小红书监控 Cron 无效: {exc}")
+
+    async def _run_xhs(self):
+        from src.services.xhs_storage import collect_products
+
+        print("定时任务触发: 正在采集小红书公开商品...")
+        try:
+            summary = collect_products()
+            print(
+                "  小红书采集完成: "
+                f"入库 {summary.get('saved', 0)}，失败 {summary.get('failed', 0)}"
+                f"{'，本轮因登录墙停止' if summary.get('stopped') else ''}"
+            )
+        except Exception as exc:
+            print(f"  [错误] 小红书采集失败: {exc}")
 
     async def _run_task(self, task_id: int, task_name: str):
         """执行定时任务"""

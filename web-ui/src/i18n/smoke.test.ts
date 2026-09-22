@@ -9,6 +9,14 @@ const ROUTE_TITLE_KEYS = [
   'routes.sellerItems',
   'routes.sellerItemDetail',
   'routes.shopAnalytics',
+  'routes.xhs',
+  'routes.xhsAdd',
+  'routes.xhsFailed',
+  'routes.xhsDelisted',
+  'routes.xhsSettings',
+  'routes.xhsShops',
+  'routes.xhsShop',
+  'routes.xhsProduct',
 ]
 
 describe('i18n smoke', () => {

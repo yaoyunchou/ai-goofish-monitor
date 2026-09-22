@@ -24,6 +24,8 @@
 |------|------|
 | [系统架构](./architecture.md) | 分层、进程、核心链路、前端、设计决策；文首链到本期里程碑 |
 | [商品监控健康度](./item-monitor-health.md) | 周健康度 / `is_muted`；**已交付，默认 `MONITOR_DRY_RUN=true`** |
+| [小红书公开商品监控](./xhs-monitor.md) | 表、高水位、独立 Cron `xhs_monitor` |
+| [变化算法对照](./metric-delta-comparison.md) | 闲鱼周差值 vs 小红书高水位；本期不改闲鱼 |
 | [PostgreSQL / Supabase 接入](./database-supabase-integration.md) | 连接、建表、迁移、自检 |
 
 ## 里程碑快照

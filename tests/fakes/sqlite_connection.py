@@ -524,6 +524,7 @@ class SqliteConnectionFactory:
         )
         conn.row_factory = adapt_sqlite_row
         conn.execute("PRAGMA foreign_keys = ON")
+        conn.create_function("now", 0, lambda: "2026-09-22T06:00:00+00:00", deterministic=True)
         return conn
 
     def __call__(self, _db_path: str | None = None):

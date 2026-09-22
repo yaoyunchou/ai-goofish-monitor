@@ -29,6 +29,7 @@ from src.api.routes import (
     collections,
     seller_subscriptions,
     shop_analytics,
+    xhs,
 )
 from src.api.dependencies import (
     set_process_service,
@@ -38,6 +39,7 @@ from src.api.dependencies import (
 from src.domain.seller_subscription import SELLER_SUBSCRIPTION_JOB_ID
 from src.services.seller_subscription_service import migrate_legacy_subscription_tasks
 from src.services.seller_subscription_storage import get_schedule, set_subscription_running
+from src.services.xhs_storage import get_schedule as get_xhs_schedule
 from src.services.task_service import TaskService
 from src.services.process_service import ProcessService
 from src.services.scheduler_service import SchedulerService
@@ -112,6 +114,8 @@ async def lifespan(app: FastAPI):
     schedule = await get_schedule()
     await scheduler_service.reload_seller_subscription_job(schedule)
     scheduler_service.reload_monitor_health_job()
+    xhs_schedule = get_xhs_schedule()
+    await scheduler_service.reload_xhs_job(xhs_schedule)
     await scheduler_service.reload_jobs(tasks_list)
     scheduler_service.start()
 
@@ -166,6 +170,7 @@ app.include_router(websocket.router)
 app.include_router(accounts.router)
 app.include_router(seller_subscriptions.router)
 app.include_router(shop_analytics.router)
+app.include_router(xhs.router)
 
 # 挂载静态文件
 # 旧的静态文件目录（用于截图等）

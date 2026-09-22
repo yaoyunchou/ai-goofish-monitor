@@ -42,6 +42,7 @@
 | 运维 | Docker 多架构部署、CI 自动发镜像、健康检查、数据库自检 |
 | 卖家订阅 | 独立 CRUD + 全局 Cron；C 端主页采集；仅入库同时有「想要+浏览量」的商品 |
 | 店铺分析 | 订阅日指标看板（今天/近7天）：想要/浏览、店排行、热门商品；旧 datacompass 接口保留但不作主页面数据源 |
+| 小红书监控 | 公开商品累计已售；今日/昨日/上小时高水位差；不使用小红书登录 |
 
 ---
 
@@ -159,6 +160,17 @@
 - 无日指标时引导去 **采集控制台** `/seller-subscriptions/collection`（次链卖家列表）
 
 **口径**：监控商品 = 指定日（或区间）日指标去重 `item_id`，不是画像 `item_count`，也不是全库跨日去重。旧 `GET /overview` 等 datacompass 接口仍保留给首页/兼容，主页面不再调用。
+
+### 2.12 小红书监控（XhsBoardView，`/xhs`）
+
+独立侧栏分组。只采集公开商品页，不使用小红书登录态。
+
+- 「添加商品」页 `/xhs/add`：每行一个公开链接或商品 ID，可套用同一店铺、分类和标记；Excel 模板导入也在这一页
+- 看板：累计已售、今日、昨日、上小时。缺基线为「—」，中途开始监控标 `*`
+- 单品页 `/xhs/:productId`：按小时、近 7 日增量
+- 定时默认关闭，在「设置」页选间隔，或每天、每周、每月的时间，存成 Cron（默认每小时整点 `0 * * * *`，北京时间），job id `xhs_monitor`
+- 「失败列表」放临时没采到的商品，可重试、忽略或删除。「下架列表」只回看页面已写明下架或违规的商品，不再采集
+- 商品可归到店铺，并带一个分类和若干标记。侧栏「店铺」按店加总。可用 Excel 模板批量导入
 
 ---
 
@@ -299,6 +311,28 @@
 | GET | `/api/shop-analytics/distribution` | 旧分布（`type=source\|category\|time\|region`） |
 | GET | `/api/shop-analytics/trend` | 旧指标趋势（`metric`、`days`、`cycle`） |
 | POST | `/api/shop-analytics/collect` | 触发 datacompass 采集任务（本页 UI 不调用） |
+
+### 3.14 小红书监控（`/api/xhs`）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/xhs/products` | 看板：还在监控、最近一次没失败也没下架的商品 |
+| GET | `/api/xhs/failures` | 临时失败 |
+| POST | `/api/xhs/failures/ignore` | 忽略失败并回到看板 |
+| GET | `/api/xhs/delisted` | 已下架，不再采集 |
+| POST | `/api/xhs/products` | 添加公开商品链接，可带店铺、分类、标记 |
+| GET | `/api/xhs/products/import-template` | 下载 Excel 模板 |
+| POST | `/api/xhs/products/import` | 按模板导入，单次最多 500 行 |
+| PATCH | `/api/xhs/products/{id}` | 修改店铺、分类、标记 |
+| GET | `/api/xhs/shops` | 店铺合计，含未归店 |
+| POST | `/api/xhs/shops` | 按店名创建，同名返回已有店 |
+| GET | `/api/xhs/shops/{id}` | 单店合计和商品 |
+| DELETE | `/api/xhs/products/{id}` | 停止监控（快照保留） |
+| POST | `/api/xhs/products/{id}/collect` | 采集单个公开页 |
+| POST | `/api/xhs/collect` | 采集全部；461 或登录墙停止本轮 |
+| GET | `/api/xhs/products/{id}/series` | `kind=hourly\|daily` |
+| GET/PATCH | `/api/xhs/schedule` | 独立 Cron，默认关闭 |
+| GET | `/api/xhs/cover` | 主图代理，只允许小红书图床 |
 
 ---
 

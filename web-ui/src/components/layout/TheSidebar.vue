@@ -12,7 +12,12 @@ import {
   Store,
   UserRoundSearch,
   Activity,
+  Plus,
+  CircleAlert,
+  Archive,
+  SlidersHorizontal,
   Package,
+  BookMarked,
 } from 'lucide-vue-next'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useI18n } from 'vue-i18n'
@@ -57,6 +62,19 @@ const navItems = computed<NavItem[]>(() => [
     ],
   },
   { to: '/shop-analytics', label: t('sidebar.shopAnalytics'), icon: Store },
+  {
+    key: 'xhs',
+    label: t('sidebar.xhs'),
+    icon: BookMarked,
+    children: [
+      { to: '/xhs', label: t('sidebar.xhsBoard'), icon: Activity },
+      { to: '/xhs/add', label: t('sidebar.xhsAdd'), icon: Plus },
+      { to: '/xhs/failed', label: t('sidebar.xhsFailed'), icon: CircleAlert },
+      { to: '/xhs/delisted', label: t('sidebar.xhsDelisted'), icon: Archive },
+      { to: '/xhs/shops', label: t('sidebar.xhsShops'), icon: Store },
+      { to: '/xhs/settings', label: t('sidebar.xhsSettings'), icon: SlidersHorizontal },
+    ],
+  },
   { to: '/logs', label: t('sidebar.logs'), icon: Terminal },
   { to: '/settings', label: t('sidebar.settings'), icon: Settings2 },
 ])
