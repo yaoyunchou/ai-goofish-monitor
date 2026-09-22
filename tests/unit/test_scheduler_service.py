@@ -1,5 +1,6 @@
 """SchedulerService 单元测试（阶段三：卖家订阅定时任务）。"""
 import asyncio
+from datetime import datetime
 
 from src.domain.models.task import Task
 from src.services.process_service import ProcessService
@@ -135,3 +136,68 @@ def test_get_seller_subscription_next_run_time_reads_mounted_job():
     )
     next_run = scheduler.get_seller_subscription_next_run_time()
     assert next_run is not None
+
+
+def test_seller_subscription_job_allows_hour_misfire_grace():
+    from src.services.scheduler_service import DAILY_JOB_MISFIRE_GRACE_SECONDS
+
+    scheduler = SchedulerService(_FakeProcessService())
+    asyncio.run(
+        scheduler.reload_seller_subscription_job(
+            {"enabled": True, "cron": "0 9 * * *"}
+        )
+    )
+    job = scheduler.scheduler.get_job("seller_subscriptions")
+    assert job.misfire_grace_time == DAILY_JOB_MISFIRE_GRACE_SECONDS
+    assert DAILY_JOB_MISFIRE_GRACE_SECONDS >= 3600
+    assert job.coalesce is True
+
+
+def test_keyword_and_health_jobs_share_misfire_grace():
+    from src.services.scheduler_service import DAILY_JOB_MISFIRE_GRACE_SECONDS
+
+    scheduler = SchedulerService(_FakeProcessService())
+    asyncio.run(scheduler.reload_jobs([_keyword_task(1, cron="0 12 * * *")]))
+    scheduler.reload_monitor_health_job("0 9 * * 1")
+    keyword_job = scheduler.scheduler.get_job("task_1")
+    health_job = scheduler.scheduler.get_job("item_monitor_health_weekly")
+    assert keyword_job.misfire_grace_time == DAILY_JOB_MISFIRE_GRACE_SECONDS
+    assert health_job.misfire_grace_time == DAILY_JOB_MISFIRE_GRACE_SECONDS
+
+
+def test_cron_trigger_actually_fires_after_two_seconds():
+    """与线上相同的 AsyncIOScheduler + 6 段 Cron，确认短延迟会触发。"""
+    from datetime import timedelta
+    from zoneinfo import ZoneInfo
+
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+    from src.core.cron_utils import build_cron_trigger
+    from src.services.scheduler_service import DAILY_JOB_MISFIRE_GRACE_SECONDS
+
+    shanghai = ZoneInfo("Asia/Shanghai")
+    fired: list[object] = []
+
+    async def _run() -> None:
+        async def probe() -> None:
+            fired.append(True)
+
+        started = datetime.now(shanghai) + timedelta(seconds=2)
+        cron = f"{started.second} {started.minute} {started.hour} * * *"
+        scheduler = AsyncIOScheduler(timezone=shanghai)
+        scheduler.add_job(
+            probe,
+            trigger=build_cron_trigger(cron, timezone=shanghai),
+            id="probe",
+            misfire_grace_time=DAILY_JOB_MISFIRE_GRACE_SECONDS,
+            coalesce=True,
+            max_instances=1,
+            replace_existing=True,
+        )
+        scheduler.start()
+        await asyncio.sleep(4)
+        if scheduler.running:
+            scheduler.shutdown(wait=False)
+
+    asyncio.run(_run())
+    assert fired, "2 秒后的 Cron 没有触发，定时器本身有问题"

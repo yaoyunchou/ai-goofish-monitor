@@ -93,6 +93,8 @@ flowchart TD
 
 **迁移**：`ensure_incremental_schema` + `supabase/migrations/20260917100000_seller_schedule_run_headless.sql`
 
+**迟到宽限**：挂 job 时 `misfire_grace_time=3600`（`DAILY_JOB_MISFIRE_GRACE_SECONDS`）。APScheduler 默认 1 秒，Windows 上隔夜 `call_later` 经常晚几秒到几分钟，会把 9:00 判 missed、采集日志完全没有新记录。1 小时只覆盖「进程一直在、定时器晚点」；进程没开则仍不补跑。调度事件写入 `logs/scheduler.log`。
+
 ---
 
 ## 5. 账号与多机分工

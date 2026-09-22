@@ -1,5 +1,20 @@
 # 变更日志
 
+## 2026-09-21
+
+### test(scheduler): 用 5 分钟 Cron 实测 APScheduler 会触发
+
+- 独立脚本 `scripts/verify_scheduler_timer.py`（不占 8010、不跑采集）
+- 实测：15:12:07 挂 `7 17 15 * * *`，15:17:07 EXECUTED，偏差 -0.26s
+- 单测 `test_cron_trigger_actually_fires_after_two_seconds` 覆盖 2 秒短延迟
+
+### fix(scheduler): 每日 Cron 迟到不再因 1 秒宽限被丢掉
+
+- 现象：调度 `0 9 * * *` 已启用、后端从昨天 11:03 一直在 8010，但今天 9 点未采集。`seller_subscriptions_-1.log` 停在昨天 11:45 手动那轮；控制台下次执行已跳到明天 9:00
+- 原因：APScheduler 默认 `misfire_grace_time=1`。隔夜 `asyncio.call_later` 在 Windows 上经常晚于 9:00:01，执行器记 missed、不拉爬虫子进程；错过记录只打在 cmd 窗口，`logs/` 里看不到
+- 处理：卖家订阅 / 健康度 / 关键词 job 宽限改为 3600 秒；调度事件写入 `logs/scheduler.log`
+- 回归：`tests/unit/test_scheduler_service.py`
+
 ## 2026-09-20
 
 ### docs: 归档 9/16–9/20 需求与技术方案

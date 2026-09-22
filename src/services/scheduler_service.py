@@ -2,17 +2,27 @@
 调度服务
 负责管理定时任务的调度
 """
+import logging
 import os
 from datetime import datetime
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from typing import List
+
+from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED, EVENT_JOB_MISSED
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from src.core.cron_utils import build_cron_trigger
 from src.domain.models.task import TASK_TYPE_SELLER_SUBSCRIPTION, Task
+from src.infrastructure.logging_config import configure_scheduler_file_logging
 from src.services.process_service import ProcessService
 
 MONITOR_HEALTH_JOB_ID = "item_monitor_health_weekly"
 DEFAULT_MONITOR_HEALTH_CRON = "0 9 * * 1"  # 每周一 09:00（Asia/Shanghai）
+# APScheduler 默认 misfire_grace_time=1 秒。Windows 上 asyncio.call_later 隔夜等待
+# 经常迟到数秒到数分钟，每日 Cron 会被直接判 missed、不跑采集。
+# 1 小时只覆盖「进程一直在、定时器晚点」；进程 11 点才启动时 9 点那枪仍不补跑。
+DAILY_JOB_MISFIRE_GRACE_SECONDS = 3600
+
+_scheduler_log = logging.getLogger("apscheduler")
 
 
 class SchedulerService:
@@ -21,12 +31,37 @@ class SchedulerService:
     def __init__(self, process_service: ProcessService):
         self.scheduler = AsyncIOScheduler(timezone="Asia/Shanghai")
         self.process_service = process_service
+        self.scheduler.add_listener(
+            self._on_job_event,
+            EVENT_JOB_MISSED | EVENT_JOB_ERROR | EVENT_JOB_EXECUTED,
+        )
 
     def start(self):
         """启动调度器"""
         if not self.scheduler.running:
+            configure_scheduler_file_logging()
             self.scheduler.start()
             print("调度器已启动")
+
+    def _cron_job_options(self) -> dict:
+        return {
+            "misfire_grace_time": DAILY_JOB_MISFIRE_GRACE_SECONDS,
+            "coalesce": True,
+            "max_instances": 1,
+            "replace_existing": True,
+        }
+
+    def _on_job_event(self, event) -> None:
+        job_id = getattr(event, "job_id", "?")
+        scheduled = getattr(event, "scheduled_run_time", None)
+        if event.code == EVENT_JOB_MISSED:
+            message = f"[调度] 错过 {job_id} 计划时间 {scheduled}，未执行"
+        elif event.code == EVENT_JOB_ERROR:
+            message = f"[调度] {job_id} 执行失败: {getattr(event, 'exception', None)}"
+        else:
+            message = f"[调度] 已执行 {job_id} 计划时间 {scheduled}"
+        print(message)
+        _scheduler_log.info(message)
 
     def stop(self):
         """停止调度器"""
@@ -87,7 +122,7 @@ class SchedulerService:
                         args=[task.id, task.task_name],
                         id=f"task_{task.id}",
                         name=f"Scheduled: {task.task_name}",
-                        replace_existing=True
+                        **self._cron_job_options(),
                     )
                     print(f"  -> 已为任务 '{task.task_name}' 添加定时规则: '{task.cron}'")
                 except ValueError as e:
@@ -113,7 +148,7 @@ class SchedulerService:
                     trigger=trigger,
                     id=job_id,
                     name="Scheduled: seller subscriptions",
-                    replace_existing=True,
+                    **self._cron_job_options(),
                 )
                 print(f"  -> 已为卖家订阅添加定时规则: '{schedule['cron']}'")
             except ValueError as exc:
@@ -143,7 +178,7 @@ class SchedulerService:
             trigger=trigger,
             id=MONITOR_HEALTH_JOB_ID,
             name="Scheduled: item monitor health check",
-            replace_existing=True,
+            **self._cron_job_options(),
         )
         print(f"  -> 已为商品监控健康度添加定时规则: '{expression}'")
         return True
