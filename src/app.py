@@ -2,6 +2,7 @@
 新架构的主应用入口
 整合所有路由和服务
 """
+import asyncio
 import logging
 import logging.config
 import sys
@@ -94,6 +95,9 @@ async def lifespan(app: FastAPI):
     logging.config.dictConfig(UVICORN_LOG_CONFIG)
     configure_app_logging()
     print("正在启动应用...")
+    from src.services.channel_workers import get_channel_workers
+
+    get_channel_workers().bind(asyncio.get_running_loop())
     bootstrap_storage()
     cleanup_task_logs(keep_days=app_settings.task_log_retention_days)
 

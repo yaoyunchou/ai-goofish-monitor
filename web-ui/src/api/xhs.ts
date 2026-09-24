@@ -140,12 +140,16 @@ export async function removeXhsProduct(productId: string): Promise<void> {
   await http(`/api/xhs/products/${productId}`, { method: 'DELETE' })
 }
 
-export async function collectXhsProduct(productId: string): Promise<{ saved: number; failed: number; stopped: boolean }> {
+export async function collectXhsProduct(productId: string): Promise<{ saved: number; failed: number; stopped: boolean; error?: string | null }> {
   return await http(`/api/xhs/products/${productId}/collect`, { method: 'POST' })
 }
 
 export async function collectAllXhs(): Promise<{ saved: number; failed: number; stopped: boolean }> {
   return await http('/api/xhs/collect', { method: 'POST' })
+}
+
+export async function getXhsCollectStatus(): Promise<{ running: boolean }> {
+  return await http('/api/xhs/collect-status')
 }
 
 export async function getXhsProduct(productId: string): Promise<XhsProduct> {

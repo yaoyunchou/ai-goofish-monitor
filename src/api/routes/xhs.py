@@ -170,18 +170,37 @@ async def remove_product(product_id: str):
     return {"ok": True}
 
 
+async def _collect_on_xhs_lane(work):
+    import asyncio
+
+    from src.services.channel_workers import ChannelBusy, get_channel_workers
+
+    try:
+        _status, done = get_channel_workers().submit("xhs", work, wait=False, on_thread=True)
+    except ChannelBusy as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return await asyncio.wrap_future(done)
+
+
 @router.post("/products/{product_id}/collect")
 async def collect_product(product_id: str):
     try:
         xhs_storage.get_product(product_id)
     except KeyError:
         raise HTTPException(status_code=404, detail="商品不在监控列表") from None
-    return xhs_storage.collect_one(product_id)
+    return await _collect_on_xhs_lane(lambda: xhs_storage.collect_one(product_id))
 
 
 @router.post("/collect")
 async def collect_all():
-    return xhs_storage.collect_products()
+    return await _collect_on_xhs_lane(xhs_storage.collect_products)
+
+
+@router.get("/collect-status")
+async def collect_status():
+    from src.services.channel_workers import get_channel_workers
+
+    return {"running": get_channel_workers().is_busy("xhs")}
 
 
 @router.get("/products/{product_id}")

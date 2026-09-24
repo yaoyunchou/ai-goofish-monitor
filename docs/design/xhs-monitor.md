@@ -40,7 +40,7 @@
 | 高水位与区间 | `src/domain/xhs_analytics.py` |
 | 链接解析、公开页字段 | `src/domain/xhs_parse.py` |
 | 读写 | `src/services/xhs_storage.py` |
-| 公开页采集（不带 Cookie） | `src/xhs_collector.py` |
+| 公开页采集（浏览器渲染，不带 Cookie） | `src/xhs_collector.py` |
 | API | `src/api/routes/xhs.py` |
 | 定时 | `SchedulerService.reload_xhs_job`，job id `xhs_monitor` |
 
@@ -48,4 +48,4 @@
 
 主图经 `GET /api/xhs/cover` 代理，只允许小红书图床域名。
 
-公开页 HTTP 461，或页面要求登录且解析不到已售：写入 `last_error`，本轮后续商品不再请求。
+公开页由浏览器打开并等页面画出已售后解析，浏览器不走本机代理。HTTP 461，或页面要求登录且解析不到已售：写入 `last_error`，本轮后续商品不再请求。不使用登录态。

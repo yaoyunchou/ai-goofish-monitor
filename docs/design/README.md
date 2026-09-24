@@ -17,6 +17,7 @@
 | [选品预算算法](./item-selection-budget.md) | 每店配额、踢出与补位（路线 A） | 再改业务代码。**设计定稿，主采集未接**（仅 `scripts/item_selection_simulate.py`） |
 | [店铺分析看板](./shop-analytics-subscription-dashboard.md) | `GET /dashboard` 字段与空心日 | 口径同时对齐策略文 **§5.4**（监控商品 ≠ 店铺商品总数） |
 | [卖家订阅采集技术方案](./seller-subscription-scrape.md) | 风控秒数、无头、账号、表与 API | **不要**在策略文重复 pacing 数字 |
+| [多渠道并行执行](./channel-execution.md) | 同渠道排队、跨渠道并行；定时入队，手动 409 | **改执行顺序先改这篇再改代码** |
 
 ## 已落地专题
 

@@ -199,11 +199,13 @@
 │ spider_v2.py    │    │ spider_v2.py    │
 │ └ Playwright    │    │ └ Playwright    │
 └─────────────────┘    └─────────────────┘
-      （每个运行中的任务一个独立子进程，互不干扰）
+      （闲鱼同一时间只拉起一个子进程；小红书不走这条进程）
 
-   另：卖家订阅采集为独立子进程入口
+   另：卖家订阅、店铺罗盘与关键词任务同属闲鱼渠道，排队共用一个浏览器进程
         python -u spider_v2.py --seller-subscriptions
         （由 SchedulerService.reload_seller_subscription_job 或 API 手动触发）
+   小红书公开页采集在另一条渠道线程里执行，不等待闲鱼，闲鱼也不等它。
+   规范见 docs/design/channel-execution.md。
 ```
 
 ### 3.2 ProcessService 子进程管理细节
@@ -680,7 +682,7 @@ Dockerfile（本地完整三阶段构建，docker compose up --build）
 
 | 决策 | 理由 / 权衡 |
 |------|-------------|
-| **爬虫放子进程而非线程** | 进程隔离避免崩溃影响主服务；Playwright 每任务独立浏览器互不干扰；可通过日志文件追踪。代价：进程调度开销。 |
+| **爬虫放子进程而非线程** | 进程隔离避免崩溃影响主服务；闲鱼同一时间只开一个浏览器，避免风控。小红书用另一条渠道线程，两边互不等待。 |
 | **存储主数据用 PostgreSQL 而非文件** | 多进程安全、可并发查询、支撑 Web UI 的分页/筛选/排序、SQLite 时代的分页是全量内存扫描。 |
 | **判定链分层短路** | 关键词（零成本）→ 启发式（零成本）→ AI 门禁（2 图轻量）→ 完整 AI（全图），把高成本步骤放在最后，显著降低 AI 调用量。 |
 | **AI 双提供方抽象** | `AIClient` 统一入口 + `AI_PROVIDER` 切换，OpenAI 兼容网关与 Cursor SDK 互不影响。 |

@@ -415,6 +415,10 @@ def collect_products(product_ids: list[str] | None = None, fetch=None) -> dict:
     results = collect_round(targets, fetch=fetch)
     summary = apply_collect_results(results)
     summary["stopped"] = any(item.blocked for item in results)
+    summary["error"] = next(
+        (item.error for item in results if item.error and not item.ok and not item.skipped),
+        None,
+    )
     return summary
 
 

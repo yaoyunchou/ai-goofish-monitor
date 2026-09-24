@@ -213,11 +213,18 @@ class SchedulerService:
                 print(f"  -> [警告] 小红书监控 Cron 无效: {exc}")
 
     async def _run_xhs(self):
+        import asyncio
+
+        from src.services.channel_workers import get_channel_workers
         from src.services.xhs_storage import collect_products
 
         print("定时任务触发: 正在采集小红书公开商品...")
+
         try:
-            summary = collect_products()
+            _status, done = get_channel_workers().submit(
+                "xhs", collect_products, wait=True, on_thread=True
+            )
+            summary = await asyncio.wrap_future(done)
             print(
                 "  小红书采集完成: "
                 f"入库 {summary.get('saved', 0)}，失败 {summary.get('failed', 0)}"
@@ -227,13 +234,28 @@ class SchedulerService:
             print(f"  [错误] 小红书采集失败: {exc}")
 
     async def _run_task(self, task_id: int, task_name: str):
-        """执行定时任务"""
+        """执行定时任务。与其他闲鱼任务排队，不等待小红书。"""
+        from src.services.channel_workers import launch_goofish
+
         print(f"定时任务触发: 正在为任务 '{task_name}' 启动爬虫...")
-        await self.process_service.start_task(task_id, task_name)
+        await launch_goofish(
+            self.process_service,
+            task_id,
+            lambda: self.process_service.start_task(task_id, task_name),
+            wait=True,
+        )
 
     async def _run_seller_subscriptions(self):
+        from src.domain.seller_subscription import SELLER_SUBSCRIPTION_JOB_ID
+        from src.services.channel_workers import launch_goofish
+
         print("定时任务触发: 正在启动卖家订阅采集...")
-        await self.process_service.start_seller_subscription_job()
+        await launch_goofish(
+            self.process_service,
+            SELLER_SUBSCRIPTION_JOB_ID,
+            self.process_service.start_seller_subscription_job,
+            wait=True,
+        )
 
     async def _run_monitor_health_check(self):
         """执行商品监控健康度周判定（自动停用 + 通知）。"""

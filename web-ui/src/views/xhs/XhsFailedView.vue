@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { collectXhsProduct, ignoreXhsFailures, listXhsFailures, removeXhsProduct, type XhsProduct } from '@/api/xhs'
+import { collectXhsProduct, getXhsCollectStatus, ignoreXhsFailures, listXhsFailures, removeXhsProduct, type XhsProduct } from '@/api/xhs'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
 import { formatDateTime } from '@/i18n'
@@ -10,6 +10,11 @@ import { formatDateTime } from '@/i18n'
 const { t } = useI18n()
 const items = ref<XhsProduct[]>([])
 const loading = ref(false)
+const retryingId = ref('')
+const serverRunning = ref(false)
+let statusTimer = 0
+
+const busy = computed(() => Boolean(retryingId.value) || serverRunning.value)
 
 async function load() {
   loading.value = true
@@ -22,16 +27,38 @@ async function load() {
   }
 }
 
+async function refreshCollectStatus() {
+  try {
+    serverRunning.value = (await getXhsCollectStatus()).running
+  } catch {
+    return
+  }
+}
+
 async function retry(productId: string) {
+  if (busy.value) return
+  retryingId.value = productId
+  toast({ title: t('xhs.collectStarted') })
   try {
     const summary = await collectXhsProduct(productId)
-    toast({
-      title: summary.stopped ? t('xhs.stopped') : t('xhs.retryDone'),
-      variant: summary.stopped ? 'destructive' : 'default',
-    })
     await load()
+    const row = items.value.find((item) => item.id === productId)
+    if (summary.saved > 0 && !summary.failed) {
+      toast({ title: t('xhs.retryDone') })
+    } else if (summary.stopped) {
+      toast({ title: t('xhs.stopped'), description: summary.error || row?.last_error || '', variant: 'destructive' })
+    } else {
+      toast({
+        title: t('xhs.retryFailed'),
+        description: summary.error || row?.last_error || t('xhs.collectFailed'),
+        variant: 'destructive',
+      })
+    }
   } catch (error) {
     toast({ title: t('common.error'), description: error instanceof Error ? error.message : t('xhs.collectFailed'), variant: 'destructive' })
+  } finally {
+    retryingId.value = ''
+    await refreshCollectStatus()
   }
 }
 
@@ -49,7 +76,15 @@ async function remove(productId: string) {
   await load()
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  refreshCollectStatus()
+  statusTimer = window.setInterval(refreshCollectStatus, 3000)
+})
+
+onUnmounted(() => {
+  window.clearInterval(statusTimer)
+})
 </script>
 
 <template>
@@ -60,6 +95,10 @@ onMounted(load)
         <p class="text-sm text-muted-foreground">{{ t('xhs.failedHint') }}</p>
       </div>
       <Button variant="outline" :disabled="loading" @click="load">{{ t('common.refresh') }}</Button>
+    </div>
+    <div v-if="busy" class="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+      <span class="h-2 w-2 animate-pulse rounded-full bg-primary" />
+      {{ t('xhs.collectingBanner') }}
     </div>
     <div class="overflow-x-auto rounded-lg border">
       <table class="w-full min-w-[720px] text-sm">
@@ -85,7 +124,9 @@ onMounted(load)
             <td class="p-3">{{ item.updated_at ? formatDateTime(item.updated_at) : '—' }}</td>
             <td class="p-3">{{ item.last_error || '—' }}</td>
             <td class="p-3 text-right">
-              <Button size="sm" variant="outline" @click="retry(item.id)">{{ t('xhs.retry') }}</Button>
+              <Button size="sm" variant="outline" :disabled="busy" @click="retry(item.id)">
+                {{ retryingId === item.id || serverRunning ? t('xhs.collecting') : t('xhs.retry') }}
+              </Button>
               <Button size="sm" variant="ghost" @click="ignore(item.id)">{{ t('xhs.ignore') }}</Button>
               <Button size="sm" variant="ghost" @click="remove(item.id)">{{ t('common.delete') }}</Button>
             </td>

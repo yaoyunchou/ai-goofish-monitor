@@ -192,7 +192,18 @@ async def run_seller_subscriptions(
 
         raise HTTPException(status_code=400, detail="卖家订阅采集已在运行中")
 
-    started = await process_service.start_seller_subscription_job()
+    from src.domain.seller_subscription import SELLER_SUBSCRIPTION_JOB_ID
+    from src.services.channel_workers import ChannelBusy, launch_goofish
+
+    try:
+        started = await launch_goofish(
+            process_service,
+            SELLER_SUBSCRIPTION_JOB_ID,
+            process_service.start_seller_subscription_job,
+            wait=False,
+        )
+    except ChannelBusy as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     if not started:
 

@@ -126,7 +126,17 @@ async def collect_now(
         raise HTTPException(status_code=404, detail="未找到已启用的店铺数据罗盘任务")
     if target.is_running:
         raise HTTPException(status_code=400, detail="采集任务已在运行中")
-    success = await process_service.start_task(target.id, target.task_name)
+    from src.services.channel_workers import ChannelBusy, launch_goofish
+
+    try:
+        success = await launch_goofish(
+            process_service,
+            target.id,
+            lambda: process_service.start_task(target.id, target.task_name),
+            wait=False,
+        )
+    except ChannelBusy as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if not success:
         raise HTTPException(status_code=500, detail="启动采集失败")
     return {"message": f"已启动任务 {target.task_name}", "task_id": target.id}

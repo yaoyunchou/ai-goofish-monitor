@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
   collectAllXhs,
   collectXhsProduct,
+  getXhsCollectStatus,
   listXhsProducts,
   removeXhsProduct,
   updateXhsLabels,
@@ -18,6 +19,12 @@ const { t } = useI18n()
 const items = ref<XhsProduct[]>([])
 const categoryFilter = ref('')
 const loading = ref(false)
+const collectingAll = ref(false)
+const collectingId = ref('')
+const serverRunning = ref(false)
+let statusTimer = 0
+
+const collectingVisible = computed(() => collectingAll.value || Boolean(collectingId.value) || serverRunning.value)
 
 const categories = computed(() => {
   const names = new Set<string>()
@@ -62,19 +69,39 @@ async function saveLabels(item: XhsProduct, patch: { shop_name?: string | null; 
   }
 }
 
+async function refreshCollectStatus() {
+  try {
+    const status = await getXhsCollectStatus()
+    serverRunning.value = status.running
+  } catch {
+    return
+  }
+}
+
 async function collectOne(productId: string) {
+  if (collectingVisible.value) return
+  collectingId.value = productId
+  toast({ title: t('xhs.collectStarted') })
   try {
     const summary = await collectXhsProduct(productId)
     if (summary.stopped) {
       toast({ title: t('xhs.stopped'), variant: 'destructive' })
+    } else {
+      toast({ title: t('xhs.collected', { saved: summary.saved }) })
     }
     await load()
   } catch (error) {
     toast({ title: t('common.error'), description: error instanceof Error ? error.message : t('xhs.collectFailed'), variant: 'destructive' })
+  } finally {
+    collectingId.value = ''
+    await refreshCollectStatus()
   }
 }
 
 async function collectAll() {
+  if (collectingVisible.value) return
+  collectingAll.value = true
+  toast({ title: t('xhs.collectStarted') })
   try {
     const summary = await collectAllXhs()
     if (summary.stopped) {
@@ -85,6 +112,9 @@ async function collectAll() {
     await load()
   } catch (error) {
     toast({ title: t('common.error'), description: error instanceof Error ? error.message : t('xhs.collectFailed'), variant: 'destructive' })
+  } finally {
+    collectingAll.value = false
+    await refreshCollectStatus()
   }
 }
 
@@ -93,7 +123,15 @@ async function remove(productId: string) {
   await load()
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  refreshCollectStatus()
+  statusTimer = window.setInterval(refreshCollectStatus, 3000)
+})
+
+onUnmounted(() => {
+  window.clearInterval(statusTimer)
+})
 </script>
 
 <template>
@@ -107,8 +145,15 @@ onMounted(load)
         <Button as-child>
           <RouterLink to="/xhs/add">{{ t('xhs.addTitle') }}</RouterLink>
         </Button>
-        <Button variant="outline" :disabled="loading" @click="collectAll">{{ t('xhs.collectAll') }}</Button>
+        <Button variant="outline" :disabled="loading || collectingVisible" @click="collectAll">
+          {{ collectingVisible ? t('xhs.collecting') : t('xhs.collectAll') }}
+        </Button>
       </div>
+    </div>
+
+    <div v-if="collectingVisible" class="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+      <span class="h-2 w-2 animate-pulse rounded-full bg-primary" />
+      {{ t('xhs.collectingBanner') }}
     </div>
 
     <div v-if="categories.length" class="flex flex-wrap gap-2">
@@ -183,7 +228,9 @@ onMounted(load)
             <td class="p-3">{{ showDelta(item.yesterday, item.yesterday_incomplete) }}</td>
             <td class="p-3">{{ showDelta(item.last_hour, item.last_hour_incomplete) }}</td>
             <td class="p-3 text-right">
-              <Button size="sm" variant="outline" @click="collectOne(item.id)">{{ t('xhs.collect') }}</Button>
+              <Button size="sm" variant="outline" :disabled="collectingVisible" @click="collectOne(item.id)">
+                {{ collectingId === item.id ? t('xhs.collecting') : t('xhs.collect') }}
+              </Button>
               <Button size="sm" variant="ghost" @click="remove(item.id)">{{ t('common.delete') }}</Button>
             </td>
           </tr>

@@ -310,6 +310,10 @@ class ProcessService:
             process.kill()
         await process.wait()
 
+    async def wait_until_exit(self, task_id: int) -> None:
+        """等到该任务子进程退出并完成清理。没有在跑的进程时立即返回。"""
+        await self._await_exit_watcher(task_id)
+
     async def _await_exit_watcher(self, task_id: int) -> None:
         watcher = self.exit_watchers.get(task_id)
         if watcher is None:

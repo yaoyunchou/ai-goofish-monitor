@@ -11,10 +11,20 @@ _GOODS_ID = re.compile(
 )
 _BARE_ID = re.compile(r"^[0-9a-fA-F]{16,}$")
 _SOLD = re.compile(r'"(?:soldCount|sold_count|saleCount)"\s*:\s*(\d+)')
+_SOLD_SPU = re.compile(
+    r'class="spu-text"[^>]*>\s*已售\s*([0-9]+(?:\.[0-9]+)?)\s*(万)?'
+)
 _SOLD_TEXT = re.compile(r"已售\s*([0-9]+(?:\.[0-9]+)?)\s*(万)?")
 _PRICE = re.compile(r'"(?:price|salePrice)"\s*:\s*(\d+(?:\.\d+)?)')
 _TITLE = re.compile(r"<title>([^<]{1,120})</title>", re.IGNORECASE)
+_GOODS_NAME = re.compile(r'class="goods-name"[^>]*>\s*([^<]{1,200})')
+_SELLER_NAME = re.compile(r'class="seller-name"[^>]*>\s*([^<]{1,80})')
 _COVER = re.compile(r'"(?:cover|image|mainImage)"\s*:\s*"(https:[^"]+)"')
+_COVER_IMG = re.compile(
+    r'<img\b[^>]*class="carousel-image"[^>]*>',
+    re.IGNORECASE,
+)
+_GENERIC_TITLES = {"小红书", "商品详情"}
 _LOGIN_MARKERS = ("登录后", "请登录", "扫码登录", "login-container")
 
 
@@ -75,35 +85,66 @@ def _delist_reason(html: str) -> str | None:
     return None
 
 
-def _parse_sold(html: str) -> int | None:
-    match = _SOLD.search(html)
-    if match:
-        return int(match.group(1))
-    text = _SOLD_TEXT.search(html)
-    if not text:
+def _sold_from_match(match: re.Match[str] | None) -> int | None:
+    if match is None:
         return None
-    value = float(text.group(1))
-    if text.group(2):
+    value = float(match.group(1))
+    if match.lastindex and match.lastindex >= 2 and match.group(2):
         value *= 10000
     return int(value)
 
 
+def _parse_sold(html: str) -> int | None:
+    match = _SOLD.search(html)
+    if match:
+        return int(match.group(1))
+    rendered = _sold_from_match(_SOLD_SPU.search(html))
+    if rendered is not None:
+        return rendered
+    return _sold_from_match(_SOLD_TEXT.search(html))
+
+
 def _parse_price(html: str) -> float | None:
     match = _PRICE.search(html)
-    if not match:
+    if match:
+        return float(match.group(1))
+    start = html.find('class="price"')
+    if start < 0:
         return None
-    return float(match.group(1))
+    open_end = html.find(">", start)
+    if open_end < 0:
+        return None
+    end = html.find('class="spu-text"', open_end)
+    chunk = html[open_end + 1:end if end > open_end else open_end + 400]
+    text = re.sub(r"<[^>]+>", "", chunk)
+    text = re.sub(r"\s+", "", text)
+    found = re.search(r"(\d+(?:\.\d+)?)", text)
+    if not found:
+        return None
+    return float(found.group(1))
 
 
 def _parse_title(html: str) -> str | None:
+    rendered = _GOODS_NAME.search(html)
+    if rendered:
+        title = rendered.group(1).strip()
+        if title:
+            return title
     match = _TITLE.search(html)
     if not match:
         return None
     title = match.group(1).strip()
-    return title or None
+    if not title or title in _GENERIC_TITLES:
+        return None
+    return title
 
 
 def _parse_shop(html: str) -> str | None:
+    rendered = _SELLER_NAME.search(html)
+    if rendered:
+        name = rendered.group(1).strip()
+        if name:
+            return name
     match = _SHOP.search(html)
     if not match:
         return None
@@ -112,6 +153,12 @@ def _parse_shop(html: str) -> str | None:
 
 def _parse_cover(html: str) -> str | None:
     match = _COVER.search(html)
-    if not match:
+    if match:
+        return match.group(1).replace("\\u002F", "/").replace("\\/", "/")
+    tag = _COVER_IMG.search(html)
+    if tag is None:
         return None
-    return match.group(1).replace("\\u002F", "/").replace("\\/", "/")
+    src = re.search(r'\bsrc="([^"]+)"', tag.group(0))
+    if src is None:
+        return None
+    return src.group(1).replace("\\u002F", "/").replace("\\/", "/")

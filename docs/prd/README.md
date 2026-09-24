@@ -13,6 +13,7 @@
 | [商品监控健康度与自动停用](./item-monitor-health.md) | **已交付（默认安全空跑）** | 周判定已上；默认 `MONITOR_AUTO_DISABLE_ENABLED=false`、`MONITOR_DRY_RUN=true`，不自动停用生产数据 |
 | [项目健康度与缺口分析](./project-health.md) | **历史基线** | 2026-09-16 审计；文内数字已过时，以 `docs/features.md` / CI 为准 |
 | [小红书公开商品监控](./xhs-monitor.md) | **本期实现** | 独立菜单；公开页；高水位差值。不改闲鱼想要/浏览 |
+| [多渠道并行执行](./channel-execution.md) | **本期实现** | 同渠道排队、跨渠道并行；goofish / xhs 两条执行线；健康度周判定不算渠道 |
 
 ## 约定
 

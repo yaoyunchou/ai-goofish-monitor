@@ -15,6 +15,9 @@ class _FakeProcessService(ProcessService):
         self.subscription_started += 1
         return True
 
+    async def wait_until_exit(self, task_id: int) -> None:
+        return None
+
 
 def _keyword_task(task_id: int, *, enabled: bool = True, cron: str = "0 8 * * *") -> Task:
     return Task(

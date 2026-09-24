@@ -84,6 +84,23 @@ def test_parse_product_id_from_goods_link_and_bare_id():
     assert is_short_link("https://xhslink.com/a/abc") is True
 
 
+def test_parse_rendered_page_uses_product_sold_not_shop_sold():
+    page = """
+    <title>商品详情</title>
+    <p class="seller-name">逐日向上的店</p>
+    <div class="seller-container">已售8834</div>
+    <div class="goods-name">用英语讲中国故事</div>
+    <div class="price" data-v-6942378f=""><span>¥</span><p><span>8</span><span class="priceDecimalPart_price2">.8</span></p></div>
+    <span class="spu-text">已售3725</span>
+    """
+    fields = parse_public_html(page)
+    assert fields.sold == 3725
+    assert fields.price == 8.8
+    assert fields.title == "用英语讲中国故事"
+    assert fields.shop_name == "逐日向上的店"
+    assert fields.login_required is False
+
+
 def test_parse_public_html_sold_and_login_wall():
     page = '<title>示例商品</title> "soldCount": 42 "price": 19.9 "shopName": "示例店"'
     fields = parse_public_html(page)
@@ -141,3 +158,31 @@ def test_collect_round_keeps_going_after_delist():
     assert outcomes[0].blocked is False
     assert outcomes[1].ok is True
     assert outcomes[1].sold == 8
+
+
+def test_note_link_fails_without_opening_or_stopping_the_round():
+    seen = []
+
+    def fetch(url: str) -> FetchResult:
+        seen.append(url)
+        return FetchResult(status=200, final_url=url, body='"soldCount": 3')
+
+    outcomes = collect_round(
+        [
+            {
+                "id": "6921871c000000001e034287",
+                "source_url": "https://www.xiaohongshu.com/discovery/item/6921871c000000001e034287",
+            },
+            {
+                "id": "64f1aabbccddeeff00112233",
+                "source_url": "https://www.xiaohongshu.com/goods-detail/64f1aabbccddeeff00112233",
+            },
+        ],
+        fetch=fetch,
+    )
+    assert outcomes[0].ok is False
+    assert outcomes[0].blocked is False
+    assert outcomes[0].error == "这是笔记链接，不是商品页，没有累计已售"
+    assert outcomes[1].skipped is False
+    assert outcomes[1].sold == 3
+    assert seen == ["https://www.xiaohongshu.com/goods-detail/64f1aabbccddeeff00112233"]

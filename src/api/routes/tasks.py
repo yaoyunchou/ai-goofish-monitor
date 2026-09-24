@@ -268,7 +268,17 @@ async def start_task(
         raise HTTPException(status_code=400, detail="任务已被禁用，无法启动")
     if task.is_running:
         raise HTTPException(status_code=400, detail="任务已在运行中")
-    success = await process_service.start_task(task_id, task.task_name)
+    from src.services.channel_workers import ChannelBusy, launch_goofish
+
+    try:
+        success = await launch_goofish(
+            process_service,
+            task_id,
+            lambda: process_service.start_task(task_id, task.task_name),
+            wait=False,
+        )
+    except ChannelBusy as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if not success:
         raise HTTPException(status_code=500, detail="启动任务失败")
     return {"message": f"任务 '{task.task_name}' 已启动"}
