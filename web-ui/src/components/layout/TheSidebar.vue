@@ -68,6 +68,7 @@ const navItems = computed<NavItem[]>(() => [
     icon: BookMarked,
     children: [
       { to: '/xhs', label: t('sidebar.xhsBoard'), icon: Activity },
+      { to: '/xhs/notes', label: t('sidebar.xhsNotes'), icon: BookMarked },
       { to: '/xhs/add', label: t('sidebar.xhsAdd'), icon: Plus },
       { to: '/xhs/failed', label: t('sidebar.xhsFailed'), icon: CircleAlert },
       { to: '/xhs/delisted', label: t('sidebar.xhsDelisted'), icon: Archive },

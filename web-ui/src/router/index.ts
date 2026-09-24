@@ -123,6 +123,24 @@ const routes = [
         meta: { titleKey: 'routes.xhsSettings', requiresAuth: true },
       },
       {
+        path: 'xhs/notes',
+        name: 'XhsNotes',
+        component: () => import('@/views/xhs/XhsNotesView.vue'),
+        meta: { titleKey: 'routes.xhsNotes', requiresAuth: true },
+      },
+      {
+        path: 'xhs/notes/add',
+        name: 'XhsNoteAdd',
+        component: () => import('@/views/xhs/XhsNoteAddView.vue'),
+        meta: { titleKey: 'routes.xhsNoteAdd', requiresAuth: true },
+      },
+      {
+        path: 'xhs/notes/settings',
+        name: 'XhsNoteSettings',
+        component: () => import('@/views/xhs/XhsNoteSettingsView.vue'),
+        meta: { titleKey: 'routes.xhsNoteSettings', requiresAuth: true },
+      },
+      {
         path: 'xhs/:productId',
         name: 'XhsProduct',
         component: () => import('@/views/xhs/XhsProductView.vue'),

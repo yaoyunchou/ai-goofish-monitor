@@ -170,6 +170,10 @@ const enUSExtra = {
     title: 'Goofish Accounts',
     description: 'Use the Chrome extension to extract login-state JSON and add accounts here.',
     add: '+ Add Account',
+    channel: 'Channel',
+    channelAll: 'All',
+    channelGoofish: 'Goofish',
+    channelXhs: 'RED',
     cookieGuide: {
       title: 'How to Get Goofish Cookies',
       step1Prefix: 'Install the',

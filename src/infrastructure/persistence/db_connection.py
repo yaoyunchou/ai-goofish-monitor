@@ -271,6 +271,63 @@ _INCREMENTAL_SCHEMA_STATEMENTS = [
     "ALTER TABLE xhs_products ADD COLUMN IF NOT EXISTS shop_id BIGINT",
     "ALTER TABLE xhs_products ADD COLUMN IF NOT EXISTS category TEXT",
     "ALTER TABLE xhs_products ADD COLUMN IF NOT EXISTS tags_json JSONB NOT NULL DEFAULT CAST('[]' AS jsonb)",
+    """
+    CREATE TABLE IF NOT EXISTS monitor_accounts (
+        id BIGSERIAL PRIMARY KEY,
+        channel TEXT NOT NULL,
+        name TEXT NOT NULL,
+        state_path TEXT NOT NULL,
+        enabled BOOLEAN NOT NULL DEFAULT TRUE,
+        last_checked_at TIMESTAMPTZ,
+        last_error TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+    """,
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_monitor_accounts_channel_name ON monitor_accounts (channel, name)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_monitor_accounts_state_path ON monitor_accounts (state_path)",
+    """
+    CREATE TABLE IF NOT EXISTS xhs_notes (
+        id TEXT PRIMARY KEY,
+        source_url TEXT,
+        title TEXT,
+        author_name TEXT,
+        cover_url TEXT,
+        account_id BIGINT,
+        active BOOLEAN NOT NULL DEFAULT TRUE,
+        last_error TEXT,
+        last_status TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS xhs_note_daily (
+        id BIGSERIAL PRIMARY KEY,
+        note_id TEXT NOT NULL REFERENCES xhs_notes(id) ON DELETE CASCADE,
+        snapshot_day DATE NOT NULL,
+        liked_count INTEGER,
+        collected_count INTEGER,
+        comment_count INTEGER,
+        view_count INTEGER,
+        captured_at TIMESTAMPTZ NOT NULL
+    )
+    """,
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_xhs_note_daily_day ON xhs_note_daily (note_id, snapshot_day)",
+    """
+    CREATE TABLE IF NOT EXISTS xhs_note_schedule (
+        id INTEGER PRIMARY KEY,
+        cron TEXT NOT NULL DEFAULT '0 9 * * *',
+        enabled BOOLEAN NOT NULL DEFAULT FALSE,
+        account_id BIGINT,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+    """,
+    """
+    INSERT INTO xhs_note_schedule (id, cron, enabled)
+    VALUES (1, '0 9 * * *', FALSE)
+    ON CONFLICT (id) DO NOTHING
+    """,
 ]
 
 

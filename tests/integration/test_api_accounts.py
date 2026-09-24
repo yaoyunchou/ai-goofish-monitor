@@ -14,7 +14,7 @@ def _client(tmp_path, monkeypatch) -> TestClient:
     return TestClient(app)
 
 
-def test_accounts_crud_flow(tmp_path, monkeypatch):
+def test_accounts_crud_flow(tmp_path, monkeypatch, offline_db):
     client = _client(tmp_path, monkeypatch)
     payload = {"name": "test-acc", "content": json.dumps({"cookies": []})}
 
@@ -41,7 +41,7 @@ def test_accounts_crud_flow(tmp_path, monkeypatch):
     assert client.get("/api/accounts/test-acc").status_code == 404
 
 
-def test_accounts_reject_invalid_name_and_json(tmp_path, monkeypatch):
+def test_accounts_reject_invalid_name_and_json(tmp_path, monkeypatch, offline_db):
     client = _client(tmp_path, monkeypatch)
 
     bad_name = client.post(

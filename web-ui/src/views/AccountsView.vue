@@ -24,14 +24,18 @@ const isDeleteDialogOpen = ref(false)
 
 const newName = ref('')
 const newContent = ref('')
+const newChannel = ref<'goofish' | 'xhs'>('goofish')
+const channelFilter = ref<'' | 'goofish' | 'xhs'>('')
 const editName = ref('')
+const editChannel = ref<'goofish' | 'xhs'>('goofish')
 const editContent = ref('')
 const deleteName = ref('')
+const deleteChannel = ref<'goofish' | 'xhs'>('goofish')
 
 async function fetchAccounts() {
   isLoading.value = true
   try {
-    accounts.value = await listAccounts()
+    accounts.value = await listAccounts(channelFilter.value || undefined)
   } catch (e) {
     toast({ title: t('accounts.toasts.loadFailed'), description: (e as Error).message, variant: 'destructive' })
   } finally {
@@ -42,14 +46,16 @@ async function fetchAccounts() {
 function openCreateDialog() {
   newName.value = ''
   newContent.value = ''
+  newChannel.value = 'goofish'
   isCreateDialogOpen.value = true
 }
 
-async function openEditDialog(name: string) {
+async function openEditDialog(account: AccountItem) {
   isSaving.value = true
   try {
-    const detail = await getAccount(name)
+    const detail = await getAccount(account.name, account.channel)
     editName.value = detail.name
+    editChannel.value = detail.channel
     editContent.value = detail.content
     isEditDialogOpen.value = true
   } catch (e) {
@@ -59,8 +65,9 @@ async function openEditDialog(name: string) {
   }
 }
 
-function openDeleteDialog(name: string) {
-  deleteName.value = name
+function openDeleteDialog(account: AccountItem) {
+  deleteName.value = account.name
+  deleteChannel.value = account.channel
   isDeleteDialogOpen.value = true
 }
 
@@ -75,7 +82,7 @@ async function handleCreateAccount() {
   }
   isSaving.value = true
   try {
-    await createAccount({ name: newName.value.trim(), content: newContent.value.trim() })
+    await createAccount({ name: newName.value.trim(), content: newContent.value.trim(), channel: newChannel.value })
     toast({ title: t('accounts.toasts.created') })
     isCreateDialogOpen.value = false
     await fetchAccounts()
@@ -93,7 +100,7 @@ async function handleUpdateAccount() {
   }
   isSaving.value = true
   try {
-    await updateAccount(editName.value, editContent.value.trim())
+    await updateAccount(editName.value, editContent.value.trim(), editChannel.value)
     toast({ title: t('accounts.toasts.updated') })
     isEditDialogOpen.value = false
     await fetchAccounts()
@@ -107,7 +114,7 @@ async function handleUpdateAccount() {
 async function handleDeleteAccount() {
   isSaving.value = true
   try {
-    await deleteAccount(deleteName.value)
+    await deleteAccount(deleteName.value, deleteChannel.value)
     toast({ title: t('accounts.toasts.deleted') })
     isDeleteDialogOpen.value = false
     await fetchAccounts()
@@ -129,6 +136,11 @@ onMounted(fetchAccounts)
         <p class="text-sm text-gray-500 mt-1">{{ t('accounts.description') }}</p>
       </div>
       <Button class="w-full sm:w-auto" @click="openCreateDialog">{{ t('accounts.add') }}</Button>
+    </div>
+    <div class="mb-4 flex gap-2">
+      <Button size="sm" :variant="channelFilter === '' ? 'default' : 'outline'" @click="channelFilter = ''; fetchAccounts()">{{ t('accounts.channelAll') }}</Button>
+      <Button size="sm" :variant="channelFilter === 'goofish' ? 'default' : 'outline'" @click="channelFilter = 'goofish'; fetchAccounts()">{{ t('accounts.channelGoofish') }}</Button>
+      <Button size="sm" :variant="channelFilter === 'xhs' ? 'default' : 'outline'" @click="channelFilter = 'xhs'; fetchAccounts()">{{ t('accounts.channelXhs') }}</Button>
     </div>
 
     <Card class="app-surface mb-6 border-none">
@@ -174,19 +186,19 @@ onMounted(fetchAccounts)
           <article
             v-else
             v-for="account in accounts"
-            :key="account.name"
+            :key="`${account.channel}-${account.name}`"
             class="app-surface-subtle p-4"
           >
             <div class="space-y-2">
               <div class="flex items-center justify-between gap-3">
                 <h3 class="truncate text-base font-semibold text-slate-900">{{ account.name }}</h3>
-                <Button size="sm" variant="outline" @click="goCreateTask(account.name)">{{ t('accounts.list.createTask') }}</Button>
+                <Button v-if="account.channel === 'goofish'" size="sm" variant="outline" @click="goCreateTask(account.name)">{{ t('accounts.list.createTask') }}</Button>
               </div>
               <p class="break-all text-sm text-slate-500">{{ account.path }}</p>
             </div>
             <div class="mt-4 flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" class="flex-1 min-w-[120px]" @click="openEditDialog(account.name)">{{ t('accounts.list.update') }}</Button>
-              <Button size="sm" variant="destructive" class="flex-1 min-w-[120px]" @click="openDeleteDialog(account.name)">{{ t('accounts.list.delete') }}</Button>
+              <Button size="sm" variant="outline" class="flex-1 min-w-[120px]" @click="openEditDialog(account)">{{ t('accounts.list.update') }}</Button>
+              <Button size="sm" variant="destructive" class="flex-1 min-w-[120px]" @click="openDeleteDialog(account)">{{ t('accounts.list.delete') }}</Button>
             </div>
           </article>
         </div>
@@ -196,25 +208,27 @@ onMounted(fetchAccounts)
             <TableHeader>
               <TableRow>
                 <TableHead>{{ t('accounts.list.name') }}</TableHead>
+                <TableHead>{{ t('accounts.channel') }}</TableHead>
                 <TableHead>{{ t('accounts.list.file') }}</TableHead>
                 <TableHead class="text-right">{{ t('accounts.list.actions') }}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               <TableRow v-if="isLoading">
-                <TableCell colspan="3" class="h-20 text-center text-muted-foreground">{{ t('common.loading') }}</TableCell>
+                <TableCell colspan="4" class="h-20 text-center text-muted-foreground">{{ t('common.loading') }}</TableCell>
               </TableRow>
               <TableRow v-else-if="accounts.length === 0">
-                <TableCell colspan="3" class="h-20 text-center text-muted-foreground">{{ t('accounts.list.empty') }}</TableCell>
+                <TableCell colspan="4" class="h-20 text-center text-muted-foreground">{{ t('accounts.list.empty') }}</TableCell>
               </TableRow>
-              <TableRow v-else v-for="account in accounts" :key="account.name">
+              <TableRow v-else v-for="account in accounts" :key="`${account.channel}-${account.name}`">
                 <TableCell class="font-medium">{{ account.name }}</TableCell>
+                <TableCell>{{ account.channel === 'xhs' ? t('accounts.channelXhs') : t('accounts.channelGoofish') }}</TableCell>
                 <TableCell class="text-sm text-gray-500">{{ account.path }}</TableCell>
                 <TableCell class="text-right">
                   <div class="flex justify-end gap-2">
-                    <Button size="sm" variant="outline" @click="goCreateTask(account.name)">{{ t('accounts.list.createTask') }}</Button>
-                    <Button size="sm" variant="outline" @click="openEditDialog(account.name)">{{ t('accounts.list.update') }}</Button>
-                    <Button size="sm" variant="destructive" @click="openDeleteDialog(account.name)">{{ t('accounts.list.delete') }}</Button>
+                    <Button v-if="account.channel === 'goofish'" size="sm" variant="outline" @click="goCreateTask(account.name)">{{ t('accounts.list.createTask') }}</Button>
+                    <Button size="sm" variant="outline" @click="openEditDialog(account)">{{ t('accounts.list.update') }}</Button>
+                    <Button size="sm" variant="destructive" @click="openDeleteDialog(account)">{{ t('accounts.list.delete') }}</Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -231,6 +245,13 @@ onMounted(fetchAccounts)
           <DialogDescription>{{ t('accounts.createDialog.description') }}</DialogDescription>
         </DialogHeader>
         <div class="space-y-4">
+          <div class="grid gap-2">
+            <Label>{{ t('accounts.channel') }}</Label>
+            <select v-model="newChannel" class="h-9 rounded-md border bg-background px-3 text-sm">
+              <option value="goofish">{{ t('accounts.channelGoofish') }}</option>
+              <option value="xhs">{{ t('accounts.channelXhs') }}</option>
+            </select>
+          </div>
           <div class="grid gap-2">
             <Label>{{ t('accounts.createDialog.name') }}</Label>
             <Input v-model="newName" :placeholder="t('accounts.createDialog.namePlaceholder')" />

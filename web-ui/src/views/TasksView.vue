@@ -193,7 +193,7 @@ async function handleToggleEnabled(task: Task, enabled: boolean) {
 
 async function fetchAccountOptions() {
   try {
-    accountOptions.value = await listAccounts()
+    accountOptions.value = await listAccounts('goofish')
   } catch (e) {
     toast({
       title: t('tasks.toasts.loadAccountsFailed'),

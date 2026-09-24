@@ -22,6 +22,7 @@ const props = defineProps<{
   enabled: boolean
   nextRunAt?: string | null
   saving?: boolean
+  frequencies?: readonly string[]
 }>()
 
 const emit = defineEmits<{
@@ -35,6 +36,7 @@ const dailyTime = ref('09:00')
 const weekday = ref<XhsWeekday>('mon')
 const monthDay = ref(1)
 const customCron = ref('0 * * * *')
+const frequencyOptions = computed(() => props.frequencies ?? XHS_FREQUENCY_OPTIONS)
 const monthDays = Array.from({ length: 31 }, (_, index) => index + 1)
 
 function applyCron(cron: string) {
@@ -122,7 +124,7 @@ function submit() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem v-if="frequency === 'custom'" value="custom">{{ t('xhs.frequency.custom') }}</SelectItem>
-            <SelectItem v-for="item in XHS_FREQUENCY_OPTIONS" :key="item" :value="item">
+            <SelectItem v-for="item in frequencyOptions" :key="item" :value="item">
               {{ t(`xhs.frequency.${item}`) }}
             </SelectItem>
           </SelectContent>

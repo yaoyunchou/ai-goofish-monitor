@@ -3,42 +3,44 @@
 > **对应 PRD**：[多渠道并行执行](../prd/channel-execution.md)  
 > **改执行顺序先改这篇，再改代码。**
 
-一条渠道等于一套爬虫资源。每个渠道一个队列、一条工作线程。同渠道排队，跨渠道并行。健康度周判定只查库，不进渠道。
+一条渠道等于一套爬虫资源，也等于一个队列。线程是共用的池子，不是每个渠道一条常驻线程。同渠道串行，不同渠道在池子有名额时并行。健康度周判定只查库，不进渠道。
 
 ## 1. 实现思路
 
-闲鱼是 `spider_v2.py` 子进程（Playwright + 登录态）。小红书在 API 进程里用另一个浏览器打开公开页，不加载闲鱼或小红书登录态，读渲染后的已售。两者不能共用一条执行线。
+闲鱼是 `spider_v2.py` 子进程（Playwright + 登录态）。小红书商品在池线程里用另一个浏览器打开公开页，不加载登录态。小红书笔记用渠道 `xhs_note`，打开笔记页时才加载选定的小红书登录文件。三者不能共用一条队列。
 
-现在有两处缠绕：
+`ChannelWorkers.bind` 只记住主事件循环，不起线程。`submit` 把任务放进该渠道队列。全进程同时在跑的渠道任务最多 5 个。没有任务时池里是 0 条线程。领到任务才启动，做完这条就退出。
 
-- `ProcessService.start_task` 只按任务 ID 防重入。两个闲鱼任务的 Cron 撞在一起时，会同时开两个浏览器。
-- `SchedulerService._run_xhs` 在事件循环里同步调用 `collect_products()`。小红书这一轮没结束，到期的闲鱼任务也启动不了。
+闲鱼任务仍用 `asyncio.run_coroutine_threadsafe` 交回主事件循环拉子进程，池线程只占住这一个名额并等到子进程退出。小红书商品和笔记用 `on_thread=True`，在池线程里直接跑，不进事件循环。
 
-做法：`ChannelWorkers` 为每个已注册渠道起一条守护线程和一个 `queue.Queue`。闲鱼任务用 `asyncio.run_coroutine_threadsafe` 交回主事件循环拉起子进程，工作线程等到进程退出才取下一个。小红书的浏览器在自己的渠道线程里打开（`on_thread=True`），不进事件循环，也不进 `asyncio.to_thread`。Playwright 的同步接口放进线程池时仍会拖住主循环，页面请求会一直等到这轮采集结束。
+手动 `wait=False`：本渠道已在跑或已在排队，立刻抛 `ChannelBusy`，HTTP 409，文案「该渠道正在采集」。全局池满但本渠道空闲时不报错，排队等名额。定时 `wait=True`：本渠道已在跑则排在后面；队列里已经有一轮时不再重复入队，返回已在排队的那个 `Future`。
 
-定时触发使用 `wait=True`：渠道忙也入队，调度协程等到这一次执行结束才返回，因此同一个 APScheduler job 的 `max_instances=1` 仍然挡住重复入队。手动触发使用 `wait=False`：渠道忙则立刻抛 `ChannelBusy`，HTTP 409，文案「该渠道正在采集」，不把请求挂到整轮结束。
+日志文件 `logs/channel_workers.log`，每行带时间和渠道，动作是 `queued`、`start`、`finish`、`fail`、`recycle`。`queued` 同时写下当前正在跑的渠道数。
+
+回收：某次任务的线程已经不在，而该渠道仍标记为占用时，下一次 `submit` 或 `is_busy` 清掉占用，给对应 `Future` 记失败，写 `recycle`，不自动再跑。线程还活着的任务不杀。
 
 ## 2. 类图
 
 ```mermaid
 classDiagram
     class ChannelWorkers {
+        +MAX_RUNNING int
         +bind(loop)
         +submit(channel, job, wait) tuple
+        +is_busy(channel) bool
     }
     class ChannelBusy {
         +channel str
     }
     class Lane {
-        +queue Queue
-        +busy bool
-        +thread Thread
+        +pending deque
+        +running Running
     }
-    ChannelWorkers --> Lane : goofish / xhs
-    ChannelWorkers ..> ChannelBusy : 手动且正忙
+    ChannelWorkers --> Lane : goofish / xhs / xhs_note
+    ChannelWorkers ..> ChannelBusy : 手动且本渠道忙
 ```
 
-`submit` 返回 `("started" | "queued", Future)`。`Future` 在这次 job 结束时完成。未知渠道抛 `ValueError`。
+`submit` 返回 `("started" | "queued", Future)`。本渠道空闲且池子还有名额时是 `started`，否则是 `queued`。未知渠道抛 `ValueError`。同时运行数不超过 `MAX_RUNNING`（5）。
 
 ## 3. 时序
 
@@ -47,26 +49,25 @@ sequenceDiagram
     participant Cron as 定时
     participant Manual as 手动
     participant Workers as ChannelWorkers
-    participant Goofish as goofish线程
-    participant Xhs as xhs线程
+    participant Pool as 线程池
     Cron->>Workers: submit goofish wait=True
-    Workers->>Goofish: 入队并执行
+    Workers->>Pool: 有名额则启动，做完退出
     Cron->>Workers: submit xhs wait=True
-    Workers->>Xhs: 另一条线程同时执行
+    Workers->>Pool: 另一条线程同时执行
     Manual->>Workers: submit 同一渠道 wait=False
     Workers-->>Manual: ChannelBusy 409
 ```
 
-闲鱼 job：主循环 `start_task` 或 `start_seller_subscription_job`，成功后再 `wait_until_exit`。小红书 job：渠道线程里直接调用 `collect_products`。关键词任务、卖家订阅、店铺罗盘都进 `goofish`。
+闲鱼 job：主循环 `start_task` 或 `start_seller_subscription_job`，成功后再 `wait_until_exit`。小红书商品：池线程里直接调用 `collect_products`。笔记：池线程里直接调用笔记采集，渠道名 `xhs_note`。关键词任务、卖家订阅、店铺罗盘都进 `goofish`。
 
 ## 4. 接入新渠道
 
-1. 在 `ChannelWorkers` 注册渠道名，并写明它占用的爬虫资源。
-2. 定时入口和手动入口只调用 `submit(渠道名, ...)`，不要在调度函数里再写一套等待。
-3. 补一条测试：与已有渠道可以同时开始，该渠道自身第二次不会重叠。
-4. 更新本篇的渠道表，再改代码。
+1. 在 `ChannelWorkers` 的默认渠道元组里登记渠道名，并写明它占用的爬虫资源。不要在 `bind` 里为它起常驻线程。
+2. 定时入口和手动入口只调用 `submit(渠道名, ...)`。需要浏览器且不能拖住事件循环的，传 `on_thread=True`。
+3. 补测试：同渠道不重叠；池里已有 5 个渠道在跑时，新渠道排队且不新开第 6 条线程。
+4. 更新本篇，再改代码。
 
-本轮不实现第三个渠道。
+已登记：`goofish`、`xhs`、`xhs_note`。
 
 ## 5. 文件
 
@@ -96,6 +97,6 @@ sequenceDiagram
 
 ## 7. 默认假设
 
-- 定时 FIFO 入队，不丢这一枪。同一任务不排两遍，靠 `max_instances=1`。
+- 定时：渠道正在跑则排在后面；队列里已经有一轮则不再入队。手动：本渠道忙或已排队才 409。池满只排队。
 - 手动忙线只返回可读文案，HTTP 409。
 - 不按闲鱼账号拆线。

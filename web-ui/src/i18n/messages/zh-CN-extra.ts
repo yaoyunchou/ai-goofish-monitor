@@ -170,6 +170,10 @@ const zhCNExtra = {
     title: '闲鱼账号管理',
     description: '使用 Chrome 扩展提取登录状态 JSON，并在此添加账号。',
     add: '+ 添加账号',
+    channel: '渠道',
+    channelAll: '全部',
+    channelGoofish: '闲鱼',
+    channelXhs: '小红书',
     cookieGuide: {
       title: '获取闲鱼 Cookie',
       step1Prefix: '安装',

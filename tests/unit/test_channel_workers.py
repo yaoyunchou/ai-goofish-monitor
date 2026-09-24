@@ -109,3 +109,59 @@ def test_xhs_thread_job_leaves_the_event_loop_free():
         assert await asyncio.wait_for(asyncio.wrap_future(done), timeout=1) == "done"
 
     asyncio.run(scenario())
+
+
+def test_sixth_channel_waits_without_a_sixth_thread(monkeypatch, tmp_path):
+    monkeypatch.setenv("CHANNEL_WORKERS_LOG", str(tmp_path / "workers.log"))
+    names = tuple(f"c{index}" for index in range(6))
+    workers = ChannelWorkers(names)
+    release = threading.Event()
+    started = [threading.Event() for _ in names]
+
+    def hold(index):
+        def job():
+            started[index].set()
+            release.wait(timeout=2)
+            return index
+        return job
+
+    async def scenario():
+        workers.bind(asyncio.get_running_loop())
+        futures = []
+        for index in range(5):
+            status, done = workers.submit(names[index], hold(index), wait=False, on_thread=True)
+            assert status == "started"
+            futures.append(done)
+        for event in started[:5]:
+            await asyncio.wait_for(asyncio.to_thread(event.wait, 1), timeout=2)
+        status, sixth = workers.submit(names[5], hold(5), wait=True, on_thread=True)
+        assert status == "queued"
+        assert not started[5].is_set()
+        alive = [thread for thread in threading.enumerate() if thread.name.startswith("channel-")]
+        assert len(alive) <= 5
+        release.set()
+        for done in futures:
+            await asyncio.wait_for(asyncio.wrap_future(done), timeout=2)
+        await asyncio.wait_for(asyncio.wrap_future(sixth), timeout=2)
+        assert started[5].is_set()
+
+    asyncio.run(scenario())
+
+
+def test_dead_thread_is_recycled(monkeypatch, tmp_path):
+    monkeypatch.setenv("CHANNEL_WORKERS_LOG", str(tmp_path / "workers.log"))
+    workers = ChannelWorkers(("goofish",))
+
+    async def scenario():
+        workers.bind(asyncio.get_running_loop())
+        dead = threading.Thread(target=lambda: None)
+        dead.start()
+        dead.join()
+        pending = __import__("concurrent.futures", fromlist=["Future"]).Future()
+        workers._lanes["goofish"].running = type("Running", (), {"thread": dead, "future": pending})()
+        assert workers.is_busy("goofish") is False
+        assert pending.exception() is not None
+        text = (tmp_path / "workers.log").read_text(encoding="utf-8")
+        assert "recycle" in text
+
+    asyncio.run(scenario())

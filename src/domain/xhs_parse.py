@@ -60,6 +60,11 @@ def is_short_link(text: str) -> bool:
     return "xhslink.com" in host
 
 
+def is_note_link(text: str) -> bool:
+    raw = (text or "").lower()
+    return "/discovery/item/" in raw or "/explore/" in raw
+
+
 def parse_public_html(html: str, status_code: int = 200) -> PublicFields:
     body = html or ""
     if status_code == 461:

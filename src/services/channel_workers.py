@@ -1,13 +1,17 @@
-"""按渠道排队执行。每个渠道一条线程，线程之间互不等待。"""
+"""渠道是队列，线程是有上限的池子。同渠道串行，没有任务时不养空闲线程。"""
 from __future__ import annotations
 
 import asyncio
-import queue
+import os
 import threading
+from collections import deque
 from concurrent.futures import Future
+from datetime import datetime
+from pathlib import Path
 from typing import Awaitable, Callable, Union
 
 BUSY_MESSAGE = "该渠道正在采集"
+MAX_RUNNING = 5
 AsyncJob = Callable[[], Awaitable[object]]
 SyncJob = Callable[[], object]
 Job = Union[AsyncJob, SyncJob]
@@ -19,82 +23,145 @@ class ChannelBusy(Exception):
         super().__init__(BUSY_MESSAGE)
 
 
+class _Running:
+    def __init__(self, thread: threading.Thread, future: Future) -> None:
+        self.thread = thread
+        self.future = future
+
+
 class _Lane:
     def __init__(self) -> None:
-        self.queue: queue.Queue[tuple[Job, Future, bool]] = queue.Queue()
-        self.lock = threading.Lock()
-        self.busy = False
-        self.thread: threading.Thread | None = None
+        self.pending: deque[tuple[Job, Future, bool]] = deque()
+        self.running: _Running | None = None
 
 
 class ChannelWorkers:
-    def __init__(self, channels: tuple[str, ...] = ("goofish", "xhs")) -> None:
+    def __init__(self, channels: tuple[str, ...] = ("goofish", "xhs", "xhs_note")) -> None:
         self._lanes = {name: _Lane() for name in channels}
         self._loop: asyncio.AbstractEventLoop | None = None
-        self._bind_lock = threading.Lock()
+        self._lock = threading.Lock()
 
     def bind(self, loop: asyncio.AbstractEventLoop) -> None:
-        with self._bind_lock:
+        with self._lock:
             self._loop = loop
-            for name, lane in self._lanes.items():
-                if lane.thread is not None and lane.thread.is_alive():
-                    continue
-                lane.thread = threading.Thread(
-                    target=self._worker,
-                    args=(name,),
-                    name=f"channel-{name}",
-                    daemon=True,
-                )
-                lane.thread.start()
 
     def submit(self, channel: str, job: Job, *, wait: bool, on_thread: bool = False) -> tuple[str, Future]:
-        lane = self._lanes.get(channel)
-        if lane is None:
-            raise ValueError(f"未知渠道: {channel}")
-        if self._loop is None:
-            try:
-                self.bind(asyncio.get_running_loop())
-            except RuntimeError as exc:
-                raise RuntimeError("渠道线程尚未绑定事件循环") from exc
-        done: Future = Future()
-        with lane.lock:
-            if not wait and lane.busy:
+        self._recycle_dead()
+        with self._lock:
+            lane = self._require(channel)
+            if self._loop is None:
+                try:
+                    self._loop = asyncio.get_running_loop()
+                except RuntimeError as exc:
+                    raise RuntimeError("渠道线程尚未绑定事件循环") from exc
+            if not wait and (lane.running is not None or lane.pending):
                 raise ChannelBusy(channel)
-            status = "started" if not lane.busy else "queued"
-            lane.queue.put((job, done, on_thread))
-            lane.busy = True
+            if wait and lane.pending:
+                self._log("queued", channel)
+                return "queued", lane.pending[0][1]
+            done: Future = Future()
+            idle = lane.running is None and not lane.pending
+            lane.pending.append((job, done, on_thread))
+            room = self._running_count() < MAX_RUNNING
+            status = "started" if idle and room else "queued"
+            self._log("queued", channel)
+            self._pump()
         return status, done
 
     def is_busy(self, channel: str) -> bool:
+        self._recycle_dead()
+        with self._lock:
+            lane = self._require(channel)
+            return lane.running is not None or bool(lane.pending)
+
+    def _require(self, channel: str) -> _Lane:
         lane = self._lanes.get(channel)
         if lane is None:
             raise ValueError(f"未知渠道: {channel}")
-        with lane.lock:
-            return lane.busy
+        return lane
 
-    def _worker(self, channel: str) -> None:
+    def _running_count(self) -> int:
+        return sum(1 for lane in self._lanes.values() if lane.running is not None)
+
+    def _pump(self) -> None:
+        while self._running_count() < MAX_RUNNING:
+            started = False
+            for name, lane in self._lanes.items():
+                if lane.running is not None or not lane.pending:
+                    continue
+                if self._running_count() >= MAX_RUNNING:
+                    break
+                job, done, on_thread = lane.pending.popleft()
+                thread = threading.Thread(
+                    target=self._run_one,
+                    args=(name, job, done, on_thread),
+                    name=f"channel-{name}",
+                    daemon=True,
+                )
+                lane.running = _Running(thread, done)
+                thread.start()
+                self._log("start", name)
+                started = True
+            if not started:
+                break
+
+    def _run_one(self, channel: str, job: Job, done: Future, on_thread: bool) -> None:
         lane = self._lanes[channel]
-        while True:
-            job, done, on_thread = lane.queue.get()
-            try:
-                if on_thread:
-                    result = job()
-                else:
-                    loop = self._loop
-                    if loop is None:
-                        raise RuntimeError("渠道线程尚未绑定事件循环")
-                    result = asyncio.run_coroutine_threadsafe(job(), loop).result()
-                if not done.done():
-                    done.set_result(result)
-            except Exception as exc:
-                print(f"[渠道 {channel}] 执行失败: {exc}")
-                if not done.done():
-                    done.set_exception(exc)
-            finally:
-                with lane.lock:
-                    if lane.queue.empty():
-                        lane.busy = False
-                lane.queue.task_done()
+        try:
+            if on_thread:
+                result = job()
+            else:
+                loop = self._loop
+                if loop is None:
+                    raise RuntimeError("渠道线程尚未绑定事件循环")
+                result = asyncio.run_coroutine_threadsafe(job(), loop).result()
+            if not done.done():
+                done.set_result(result)
+            self._log("finish", channel)
+        except Exception as exc:
+            print(f"[渠道 {channel}] 执行失败: {exc}")
+            if not done.done():
+                done.set_exception(exc)
+            self._log("fail", channel, str(exc))
+        finally:
+            with self._lock:
+                if lane.running is not None and lane.running.future is done:
+                    lane.running = None
+                self._pump()
+
+    def _recycle_dead(self) -> None:
+        with self._lock:
+            changed = False
+            for name, lane in self._lanes.items():
+                running = lane.running
+                if running is None or running.thread.is_alive():
+                    continue
+                if not running.future.done():
+                    running.future.set_exception(RuntimeError("渠道线程已退出"))
+                lane.running = None
+                self._log("recycle", name)
+                changed = True
+            if changed:
+                self._pump()
+
+    def _log(self, action: str, channel: str, detail: str = "") -> None:
+        running = self._running_count()
+        stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        extra = f" running={running}" if action == "queued" else ""
+        if detail and action == "fail":
+            extra = f" {detail.splitlines()[0][:180]}"
+        line = f"{stamp} {channel} {action}{extra}\n"
+        path = _log_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(line)
+
+
+def _log_path() -> Path:
+    override = os.environ.get("CHANNEL_WORKERS_LOG", "").strip()
+    if override:
+        return Path(override)
+    return Path(__file__).resolve().parents[2] / "logs" / "channel_workers.log"
 
 
 _workers: ChannelWorkers | None = None

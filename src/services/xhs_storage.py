@@ -13,7 +13,7 @@ from src.domain.xhs_analytics import (
 )
 from src.domain.xhs_import import parse_import_workbook
 from src.domain.xhs_labels import normalize_category, normalize_shop_name, normalize_tags
-from src.domain.xhs_parse import is_short_link, parse_product_id, parse_public_html
+from src.domain.xhs_parse import is_note_link, is_short_link, parse_product_id, parse_public_html
 from src.domain.xhs_shops import rollup_products
 from src.infrastructure.persistence.db_connection import db_connection
 from src.infrastructure.persistence.sql_dialect import json_text, parse_json_field
@@ -53,6 +53,8 @@ def add_product(
     source_url = (url_or_id or "").strip()
     if not source_url:
         raise ValueError("请填写商品链接")
+    if is_note_link(source_url):
+        raise ValueError("这是笔记，请到笔记菜单添加")
     product_id = parse_product_id(source_url)
     if product_id is None and is_short_link(source_url):
         fetched = fetch_public(source_url)
@@ -61,6 +63,8 @@ def add_product(
         fields = parse_public_html(fetched.body, fetched.status)
         if fields.login_required:
             raise ShortLinkBlocked("公开页要求登录，已停止后续短链")
+        if is_note_link(fetched.final_url):
+            raise ValueError("这是笔记，请到笔记菜单添加")
         product_id = parse_product_id(fetched.final_url)
         if fetched.final_url.startswith("http"):
             source_url = fetched.final_url
